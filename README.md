@@ -17,7 +17,7 @@ directly within a simple query string.
 Viewing lines before (`-B`), after (`-A`), or surrounding (`-C`) the match.
 * **Smart Highlighting**:
 Automatically colors matched terms for better readability.
-* **Column Indication**
+* **Customizable separator character**
 
 ## Installation
 
@@ -79,6 +79,14 @@ for strings containing special characters:
   * However, in some special cases,
     such as `*` matches `*` in wildcard,
     the escape sequence must be used.
+
+* Only the first character of a query group is checked to see
+if it's a valid query prefix.
+  * You can search for strings containing a character matching the query prefix
+  at the beginning of the query by specifying the query prefix in query:
+  * `"++example"` will find strings containing `+example`
+  * `"+-example"` will find strings containing `-example`
+  * `"-+example"` will find strings NOT containing `+example`
 
 * To ensure the print order in parallel processing,
 a disk buffer will be used and temporary file generated will be stored

@@ -72,14 +72,10 @@ func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag) func(
 			parts = applyIf(parts, combinedFlag&WORDS != 0, func(p string) []string { return splitAndTrim(p, "") })
 
 			for _, part := range parts {
-				part = strings.TrimSpace(part)
-
-				if part != "" {
-					if !yield(currentIndex, part) {
-						return
-					}
-					currentIndex++
+				if !yield(currentIndex, part) {
+					return
 				}
+				currentIndex++
 			}
 		}
 
