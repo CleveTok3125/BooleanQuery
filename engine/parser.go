@@ -9,10 +9,11 @@ import (
 )
 
 type searchTerm struct {
-	splited   []string
-	whiteList []string
-	blackList []string
-	greyList  []string
+	splited     []string
+	whiteList   []string // AND (+)
+	blackList   []string // NOT (-)
+	greyList    []string // OR (~)
+	orderedList []string // ORDERED (^)
 }
 
 func (engine *Engine) SetSearchTerm(searchTerm string) {
@@ -29,6 +30,7 @@ func (engine *Engine) Classify() {
 		"+": &engine.searchTerm.whiteList,
 		"-": &engine.searchTerm.blackList,
 		"~": &engine.searchTerm.greyList,
+		"^": &engine.searchTerm.orderedList,
 	}
 
 	for _, term := range engine.searchTerm.splited {

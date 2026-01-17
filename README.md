@@ -2,18 +2,22 @@
 
 **BooleanQuery** is a high-performance,
 concurrent CLI text search tool written in Go.
-It allows searching using complex boolean logic (AND, OR, NOT)
+It allows searching using complex boolean logic (AND, OR, NOT, ORDERED AND)
 directly within a simple query string.
 
 ## Key Features
 
 * **Advanced Boolean Logic**:
-Combine **AND**, **NOT**, and **OR** (GreyList) logic in a single query.
-* **High Concurrency**: Process multiple files in parallel.
+  * **AND**: All terms must be present.
+  * **OR** (GreyList): At least one term must be present.
+  * **NOT**: Term must not be present.
+  * **ORDERED AND**: Terms must appear in a specific sequence.
+* **Parallel Processing**: Process multiple files concurrently.
 * **Context Printing**:
 Viewing lines before (`-B`), after (`-A`), or surrounding (`-C`) the match.
 * **Smart Highlighting**:
 Automatically colors matched terms for better readability.
+* **Column Indication**
 
 ## Installation
 
@@ -54,11 +58,31 @@ The line **must not** contain this term.
     * Example: `"error -timeout"`
     * *Matches lines containing "error" but NOT "timeout".*
 
-3. **OR / GreyList (`~`)**:
-If "GreyList" terms are present, the line must contain **at least one** of them.
+3. **OR (`~`)**:
+If **OR** terms are present, the line must contain **at least one** of them.
 
     * Example: `"struct ~json ~xml"`
     * *Matches lines containing "struct" AND (either "json" OR "xml").*
+
+4. **ORDERED AND (`^`)**:
+The line must contain these terms in the **exact order** they appear in the query.
+
+    * Example: `"^func ^main"`
+    * *Matches `func main() { ... }*`
+    * *Does NOT match `// main is called by func wrapper` (wrong order).*
+
+### Notes
+
+* Grouping can be done by using `'` (single quotes)
+for strings containing special characters:
+  * Example: `./bq "+'+2 cards' ~reverse"`
+  * However, in some special cases,
+    such as `*` matches `*` in wildcard,
+    the escape sequence must be used.
+
+* To ensure the print order in parallel processing,
+a disk buffer will be used and temporary file generated will be stored
+in the temporary directory.
 
 ## ToDo
 
@@ -67,4 +91,5 @@ If "GreyList" terms are present, the line must contain **at least one** of them.
 Automatically detect and skip binary files to prevent terminal corruption.
 * [ ] Add `-c` (`--count`) flag to print only the count of matching lines.
 * [ ] Add (`--count-files`) flag to print only matched files.
-* [ ] Add column indices for matches.
+* [x] Add column indices for matches.
+* [ ] Wildcard support

@@ -1,202 +1,278 @@
 package engine
 
 import (
-	"fmt"
-	"log"
-	"regexp"
+	"sort"
 	"strings"
+	"unicode"
 )
 
-func buildLPS(pattern string) []int {
-	m := len(pattern)
-	lps := make([]int, m)
-
-	lenPrev := 0
-	i := 1
-
-	for i < m {
-		if pattern[i] == pattern[lenPrev] {
-			lenPrev++
-			lps[i] = lenPrev
-			i++
-		} else {
-			if lenPrev != 0 {
-				lenPrev = lps[lenPrev-1]
-			} else {
-				lps[i] = 0
-				i++
-			}
-		}
-	}
-
-	return lps
-}
-
-func KMPSearch(text, pattern string) []int {
-	n, m := len(text), len(pattern)
-	if m == 0 {
-		positions := make([]int, n+1)
-		for i := range positions {
-			positions[i] = i
-		}
-		return positions
-	}
-
-	if n < m {
-		return nil
-	}
-
-	lps := buildLPS(pattern)
-	var result []int
-
-	i, j := 0, 0
-	for i < n {
-		if text[i] == pattern[j] {
-			i++
-			j++
-			if j == m {
-				result = append(result, i-j)
-				j = lps[j-1]
-			}
-		} else {
-			if j != 0 {
-				j = lps[j-1]
-			} else {
-				i++
-			}
-		}
-	}
-	return result
-}
-
-func searchWord(term string, text string) (bool, error) {
-	escaped := regexp.QuoteMeta(term)
-	pattern := fmt.Sprintf(`\b%s\b`, escaped)
-
-	re, err := regexp.Compile(pattern)
-	if err != nil {
-		return false, err
-	}
-
-	return re.MatchString(text), nil
-}
-
-func (engine *Engine) containAnyHelper(term string, text string) bool {
-	if engine.Config.ExactWord {
-		ok, err := searchWord(term, text)
-		if err != nil {
-			log.Printf("searchWord error: %v", err)
-		}
-
-		if ok {
-			return true
-		}
-	}
-
-	if !engine.Config.ExactWord && len(KMPSearch(text, term)) > 0 {
+func isBoundaryChar(text string, pos int) bool {
+	if pos < 0 || pos >= len(text) {
 		return true
 	}
-
-	return false
+	r := rune(text[pos])
+	return !unicode.IsLetter(r) && !unicode.IsNumber(r) && r != '_'
 }
 
-func (engine *Engine) containAny(terms []string, text string) bool {
+func (engine *Engine) findAllTermIndices(text string, term string) [][2]int {
+	var matches [][2]int
+	currentIdx := 0
+	termLen := len(term)
+
+	for {
+		idx := strings.Index(text[currentIdx:], term)
+		if idx == -1 {
+			break
+		}
+
+		realStart := currentIdx + idx
+		realEnd := realStart + termLen
+
+		isValid := true
+		if engine.Config.ExactWord {
+			if !isBoundaryChar(text, realStart-1) || !isBoundaryChar(text, realEnd) {
+				isValid = false
+			}
+		}
+
+		if isValid {
+			matches = append(matches, [2]int{realStart, realEnd})
+		}
+
+		currentIdx = realStart + 1
+	}
+	return matches
+}
+
+func (engine *Engine) findTermIndex(text string, term string, startIdx int) (int, int) {
+	currentIdx := startIdx
+	termLen := len(term)
+
+	for {
+		idx := strings.Index(text[currentIdx:], term)
+		if idx == -1 {
+			return -1, -1
+		}
+
+		realStart := currentIdx + idx
+		realEnd := realStart + termLen
+
+		if !engine.Config.ExactWord {
+			return realStart, realEnd
+		}
+
+		if isBoundaryChar(text, realStart-1) && isBoundaryChar(text, realEnd) {
+			return realStart, realEnd
+		}
+
+		currentIdx = realStart + 1
+	}
+}
+
+func (engine *Engine) containAnyCheckOnly(terms []string, text string) int {
+	matchText := text
 	if engine.Config.IgnoreCase {
-		text = strings.ToLower(text)
+		matchText = strings.ToLower(text)
 	}
 
 	for _, term := range terms {
+		matchTerm := term
+
 		if engine.Config.IgnoreCase {
-			term = strings.ToLower(term)
+			matchTerm = strings.ToLower(term)
 		}
 
-		if engine.containAnyHelper(term, text) {
-			return true
+		start, _ := engine.findTermIndex(matchText, matchTerm, 0)
+		if start != -1 {
+			return start
 		}
 	}
 
-	return false
+	return -1
 }
 
-func (engine *Engine) containAll(terms []string, text string) bool {
+func (engine *Engine) containAny(terms []string, text string) [][2]int {
+	matchText := text
 	if engine.Config.IgnoreCase {
-		text = strings.ToLower(text)
+		matchText = strings.ToLower(text)
+	}
+
+	var matches [][2]int
+
+	for _, term := range terms {
+		matchTerm := term
+		if engine.Config.IgnoreCase {
+			matchTerm = strings.ToLower(term)
+		}
+
+		termMatches := engine.findAllTermIndices(matchText, matchTerm)
+
+		if len(termMatches) > 0 {
+			matches = append(matches, termMatches...)
+		}
+	}
+
+	if len(matches) == 0 {
+		return nil
+	}
+	return matches
+}
+
+func (engine *Engine) containAllCheckOnly(terms []string, text string) bool {
+	matchText := text
+	if engine.Config.IgnoreCase {
+		matchText = strings.ToLower(text)
 	}
 
 	for _, term := range terms {
+		matchTerm := term
 		if engine.Config.IgnoreCase {
-			term = strings.ToLower(term)
+			matchTerm = strings.ToLower(term)
 		}
 
-		if !engine.containAnyHelper(term, text) {
+		start, _ := engine.findTermIndex(matchText, matchTerm, 0)
+		if start == -1 {
 			return false
 		}
 	}
-
 	return true
 }
 
-func (engine *Engine) IsMatch(text string) bool {
-	blacklist := engine.searchTerm.blackList
-	whitelist := engine.searchTerm.whiteList
-	greylist := engine.searchTerm.greyList
-
-	if len(blacklist) > 0 && engine.containAny(blacklist, text) {
-		return false
+func (engine *Engine) containAll(terms []string, text string) [][2]int {
+	matchText := text
+	if engine.Config.IgnoreCase {
+		matchText = strings.ToLower(text)
 	}
 
-	if len(whitelist) > 0 && !engine.containAll(whitelist, text) {
-		return false
-	}
+	var matches [][2]int
 
-	if len(greylist) > 0 && !engine.containAny(greylist, text) {
-		return false
-	}
-
-	return true
-}
-
-func (engine *Engine) PrepareHighlight() {
-	terms := append([]string{}, engine.searchTerm.whiteList...)
-	terms = append(terms, engine.searchTerm.greyList...)
-
-	if len(terms) == 0 {
-		return
-	}
-
-	var patterns []string
 	for _, term := range terms {
-		escaped := regexp.QuoteMeta(term)
-		if engine.Config.ExactWord {
-			patterns = append(patterns, fmt.Sprintf(`\b%s\b`, escaped))
-		} else {
-			patterns = append(patterns, escaped)
+		matchTerm := term
+		if engine.Config.IgnoreCase {
+			matchTerm = strings.ToLower(term)
+		}
+
+		termMatches := engine.findAllTermIndices(matchText, matchTerm)
+
+		if len(termMatches) == 0 {
+			return nil
+		}
+
+		matches = append(matches, termMatches...)
+	}
+
+	return matches
+}
+
+func (engine *Engine) containOrderedCheckOnly(terms []string, text string) bool {
+	matchText := text
+	if engine.Config.IgnoreCase {
+		matchText = strings.ToLower(text)
+	}
+
+	currentPos := 0
+	for _, term := range terms {
+		matchTerm := term
+		if engine.Config.IgnoreCase {
+			matchTerm = strings.ToLower(term)
+		}
+
+		_, end := engine.findTermIndex(matchText, matchTerm, currentPos)
+		if end == -1 {
+			return false
+		}
+		currentPos = end
+	}
+	return true
+}
+
+func (engine *Engine) containOrdered(terms []string, text string) [][2]int {
+	matchText := text
+	if engine.Config.IgnoreCase {
+		matchText = strings.ToLower(text)
+	}
+
+	var matches [][2]int
+	currentPos := 0
+
+	for _, term := range terms {
+		matchTerm := term
+		if engine.Config.IgnoreCase {
+			matchTerm = strings.ToLower(term)
+		}
+
+		start, end := engine.findTermIndex(matchText, matchTerm, currentPos)
+
+		if start == -1 {
+			return nil
+		}
+
+		matches = append(matches, [2]int{start, end})
+
+		currentPos = end
+	}
+
+	return matches
+}
+
+func (engine *Engine) Search(text string) [][2]int {
+	if engine.containAnyCheckOnly(engine.searchTerm.blackList, text) != -1 {
+		return nil
+	}
+
+	if engine.Config.NoColor {
+		if len(engine.searchTerm.orderedList) > 0 {
+			if !engine.containOrderedCheckOnly(engine.searchTerm.orderedList, text) {
+				return nil
+			}
+		}
+
+		if len(engine.searchTerm.whiteList) > 0 {
+			if !engine.containAllCheckOnly(engine.searchTerm.whiteList, text) {
+				return nil
+			}
+		}
+
+		return [][2]int{}
+	}
+
+	var allMatches [][2]int
+
+	if len(engine.searchTerm.orderedList) > 0 {
+		orderedMatches := engine.containOrdered(engine.searchTerm.orderedList, text)
+		if orderedMatches == nil {
+			return nil
+		}
+		allMatches = append(allMatches, orderedMatches...)
+	}
+
+	if len(engine.searchTerm.whiteList) > 0 {
+		whiteMatches := engine.containAll(engine.searchTerm.whiteList, text)
+		if whiteMatches == nil {
+			return nil
+		}
+		allMatches = append(allMatches, whiteMatches...)
+	}
+
+	if len(engine.searchTerm.greyList) > 0 {
+		greyMatches := engine.containAny(engine.searchTerm.greyList, text)
+		if greyMatches != nil {
+			allMatches = append(allMatches, greyMatches...)
 		}
 	}
 
-	fullPattern := strings.Join(patterns, "|")
-	if engine.Config.IgnoreCase {
-		fullPattern = "(?i)(" + fullPattern + ")"
-	} else {
-		fullPattern = "(" + fullPattern + ")"
+	if len(allMatches) == 0 {
+		if len(engine.searchTerm.orderedList) == 0 &&
+			len(engine.searchTerm.whiteList) == 0 &&
+			len(engine.searchTerm.greyList) == 0 {
+			return [][2]int{}
+		}
+		return nil
 	}
 
-	re, err := regexp.Compile(fullPattern)
-	if err != nil {
-		log.Printf("Error compiling highlight regex: %v", err)
-		return
-	}
-	engine.highlightRe = re
-}
+	sort.Slice(allMatches, func(i, j int) bool {
+		return allMatches[i][0] < allMatches[j][0]
+	})
 
-func (engine *Engine) Highlight(text string) string {
-	if engine.Config.NoColor {
-		return text
-	}
-
-	if engine.highlightRe == nil {
-		return text
-	}
-
-	return engine.highlightRe.ReplaceAllString(text, ColorRed+"$1"+ColorReset)
+	return allMatches
 }

@@ -1,12 +1,9 @@
 package engine
 
-import "regexp"
-
 type Engine struct {
 	Config Config
 
-	searchTerm  searchTerm
-	highlightRe *regexp.Regexp
+	searchTerm searchTerm
 }
 
 func New() *Engine {

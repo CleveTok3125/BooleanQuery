@@ -1,12 +1,14 @@
 package main
 
 import (
-	"bytes"
+	"bufio"
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"runtime"
 	"sync"
+	"syscall"
 
 	"BooleanQuery/engine"
 
@@ -25,6 +27,8 @@ var cli struct {
 	NoIndex    bool   `help:"Disable index numbers in output." default:"false"`
 	NoFilename bool   `help:"Disable file name prefix." default:"false"`
 
+	Stream bool `help:"Force sequential processing (single-threaded) and print immediately." default:"false"`
+
 	After   int `short:"A" help:"Print N lines after match."`
 	Before  int `short:"B" help:"Print N lines before match."`
 	Context int `short:"C" help:"Print N lines before and after match."`
@@ -37,7 +41,7 @@ type lineInfo struct {
 
 var errorLock sync.Mutex
 
-func printLine(w io.Writer, e *engine.Engine, index int, part string) {
+func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part string) {
 	cIndex := engine.ColorBrightBlack
 	cReset := engine.ColorReset
 
@@ -46,34 +50,54 @@ func printLine(w io.Writer, e *engine.Engine, index int, part string) {
 		cReset = ""
 	}
 
-	if e.Config.NoIndex {
-		fmt.Fprintf(w, "%s\n", e.Highlight(part))
-	} else {
-		fmt.Fprintf(w, "%s%d:%s %s\n", cIndex, index, cReset, e.Highlight(part))
+	prefix := ""
+	if !e.Config.NoIndex {
+		colDisplay := -1
+		if len(matches) > 0 {
+			colDisplay = matches[0][0]
+		}
+
+		if colDisplay != -1 {
+			prefix = fmt.Sprintf("%s%d:%d:%s ", cIndex, index+1, colDisplay+1, cReset)
+		} else {
+			prefix = fmt.Sprintf("%s%d:%s ", cIndex, index, cReset)
+		}
 	}
+
+	printText := e.Highlight(part, matches)
+
+	fmt.Fprintf(w, "%s%s\n", prefix, printText)
 }
 
-func processInput(w io.Writer, e *engine.Engine, reader io.Reader) {
+func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName string) {
 	combinedFlag := engine.CombineFlags(engine.CHARSEP)
 
 	var beforeBuffer []lineInfo
 	linesToPrintAfter := 0
 	lastPrintedIndex := -1
 
+	headerPrinted := false
+
+	if !headerPrinted && displayName != "" {
+		fmt.Fprintf(w, "--- File: %s ---\n", displayName)
+		headerPrinted = true
+	}
+
 	iter := e.ProcessStream(reader, combinedFlag)
 
 	iter(func(index int, part string) bool {
-		isMatch := e.IsMatch(part)
+		matches := e.Search(part)
+		matched := matches != nil
 
-		if isMatch {
+		if matched {
 			for _, item := range beforeBuffer {
 				if item.index > lastPrintedIndex {
-					printLine(w, e, item.index, item.text)
+					printLine(w, e, item.index, nil, item.text)
 					lastPrintedIndex = item.index
 				}
 			}
 
-			printLine(w, e, index, part)
+			printLine(w, e, index, matches, part)
 			lastPrintedIndex = index
 
 			beforeBuffer = nil
@@ -82,7 +106,7 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader) {
 		} else {
 			if linesToPrintAfter > 0 {
 				if index > lastPrintedIndex {
-					printLine(w, e, index, part)
+					printLine(w, e, index, nil, part)
 					lastPrintedIndex = index
 				}
 				linesToPrintAfter--
@@ -100,26 +124,49 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader) {
 	})
 }
 
-func processFile(e *engine.Engine, path string) (*bytes.Buffer, error) {
+func getDisplayName(path string, e *engine.Engine) string {
+	if len(cli.Files) > 1 && !e.Config.NoFilename {
+		return path
+	}
+	return ""
+}
+
+func processFile(w io.Writer, e *engine.Engine, path string) error {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer f.Close()
 
-	var contentBuf bytes.Buffer
-	processInput(&contentBuf, e, f)
+	displayName := getDisplayName(path, e)
+	processInput(w, e, f, displayName)
+	return nil
+}
 
-	var finalBuf bytes.Buffer
-
-	if contentBuf.Len() > 0 {
-		if len(cli.Files) > 1 && !e.Config.NoFilename {
-			fmt.Fprintf(&finalBuf, "--- File: %s ---\n", path)
-		}
-		contentBuf.WriteTo(&finalBuf)
+func processFileToTemp(e *engine.Engine, path string) (string, bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", false, err
 	}
+	defer f.Close()
 
-	return &finalBuf, nil
+	tmpFile, err := os.CreateTemp("", "bq-buffer-*")
+	if err != nil {
+		return "", false, err
+	}
+	defer tmpFile.Close()
+
+	bufWriter := bufio.NewWriter(tmpFile)
+
+	displayName := getDisplayName(path, e)
+	processInput(bufWriter, e, f, displayName)
+
+	bufWriter.Flush()
+
+	stat, _ := tmpFile.Stat()
+	hasContent := stat.Size() > 0
+
+	return tmpFile.Name(), hasContent, nil
 }
 
 func main() {
@@ -143,43 +190,88 @@ func main() {
 
 	e.SetSearchTerm(cli.Query)
 	e.Classify()
-	e.PrepareHighlight()
 
-	if len(cli.Files) == 0 {
-		processInput(os.Stdout, e, os.Stdin)
-	} else {
-		numCPU := runtime.NumCPU()
-		sem := make(chan struct{}, numCPU)
-		var wg sync.WaitGroup
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 
-		results := make([]*bytes.Buffer, len(cli.Files))
+	var tempFiles []string
+	var tempFilesLock sync.Mutex
 
-		for i, path := range cli.Files {
-			wg.Add(1)
+	go func() {
+		<-c
+		tempFilesLock.Lock()
+		for _, f := range tempFiles {
+			os.Remove(f)
+		}
+		tempFilesLock.Unlock()
+		os.Exit(1)
+	}()
 
-			go func(idx int, p string) {
-				defer wg.Done()
-				sem <- struct{}{}
-				defer func() { <-sem }()
+	stdoutWriter := bufio.NewWriter(os.Stdout)
+	defer stdoutWriter.Flush()
 
-				buf, err := processFile(e, p)
-				if err != nil {
-					errorLock.Lock()
-					fmt.Fprintf(os.Stderr, "Error: %s\n", err)
-					errorLock.Unlock()
-					return
-				}
-
-				results[idx] = buf
-			}(i, path)
+	if len(cli.Files) <= 1 || cli.Stream {
+		if len(cli.Files) == 0 {
+			processInput(stdoutWriter, e, os.Stdin, "")
+			return
 		}
 
-		wg.Wait()
-
-		for _, buf := range results {
-			if buf != nil && buf.Len() > 0 {
-				buf.WriteTo(os.Stdout)
+		for _, path := range cli.Files {
+			if err := processFile(stdoutWriter, e, path); err != nil {
+				stdoutWriter.Flush()
+				fmt.Fprintf(os.Stderr, "Error opening %s: %v\n", path, err)
 			}
+			stdoutWriter.Flush()
 		}
+		return
+	}
+
+	numCPU := runtime.NumCPU()
+	sem := make(chan struct{}, numCPU)
+	var wg sync.WaitGroup
+
+	tempResults := make([]string, len(cli.Files))
+
+	for i, path := range cli.Files {
+		wg.Add(1)
+		go func(idx int, p string) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			tmpPath, hasContent, err := processFileToTemp(e, p)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error processing %s: %v\n", p, err)
+				return
+			}
+
+			tempFilesLock.Lock()
+			tempFiles = append(tempFiles, tmpPath)
+			tempFilesLock.Unlock()
+
+			if hasContent {
+				tempResults[idx] = tmpPath
+			} else {
+				os.Remove(tmpPath)
+				tempResults[idx] = ""
+			}
+		}(i, path)
+	}
+
+	wg.Wait()
+
+	for _, tmpPath := range tempResults {
+		if tmpPath == "" {
+			continue
+		}
+
+		f, err := os.Open(tmpPath)
+		if err == nil {
+			io.Copy(stdoutWriter, f)
+			f.Close()
+		}
+
+		os.Remove(tmpPath)
+		stdoutWriter.Flush()
 	}
 }
