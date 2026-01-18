@@ -2,9 +2,6 @@
 package engine
 
 import (
-	"log"
-	"strings"
-
 	"mvdan.cc/sh/v3/shell"
 )
 
@@ -16,13 +13,14 @@ type searchTerm struct {
 	orderedList []string // ORDERED (^)
 }
 
-func (engine *Engine) SetSearchTerm(searchTerm string) {
+func (engine *Engine) SetSearchTerm(searchTerm string) error {
 	words, err := shell.Fields(searchTerm, nil)
 	if err != nil {
-		log.Fatal("Error splitting search term:", err)
+		return err
 	}
 
 	engine.searchTerm.splited = words
+	return nil
 }
 
 func (engine *Engine) Classify() {
@@ -34,7 +32,7 @@ func (engine *Engine) Classify() {
 	}
 
 	for _, term := range engine.searchTerm.splited {
-		if strings.TrimSpace(term) == "" {
+		if term == "" {
 			continue
 		}
 

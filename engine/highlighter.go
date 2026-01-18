@@ -13,7 +13,7 @@ func mergeIntervals(matches [][2]int) [][2]int {
 	for i := 1; i < len(matches); i++ {
 		next := matches[i]
 
-		if next[0] < current[1] {
+		if next[0] <= current[1] {
 			if next[1] > current[1] {
 				current[1] = next[1]
 			}
