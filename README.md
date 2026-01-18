@@ -21,7 +21,7 @@ Automatically colors matched terms for better readability.
 
 ## Installation
 
-**Prerequisites:** Go 1.25.5 or higher.
+**Prerequisites:** Go 1.25.4 or higher.
 
 ```fish
 # Clone the repository
