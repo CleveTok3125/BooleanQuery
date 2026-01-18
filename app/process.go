@@ -1,4 +1,4 @@
-// Package app handling user interfaces
+// Package app handling processes & user interfaces
 package app
 
 import (
@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strings"
 
 	"BooleanQuery/engine"
 )
@@ -26,15 +27,22 @@ func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part 
 
 	prefix := ""
 	if !e.Config.NoIndex {
+		lineStr := fmt.Sprintf("%*d", padLine, index+1)
+
 		colDisplay := -1
 		if len(matches) > 0 {
 			colDisplay = matches[0][0]
 		}
 
 		if colDisplay != -1 {
-			prefix = fmt.Sprintf("%s%d:%d:%s ", cIndex, index+1, colDisplay+1, cReset)
+			prefix = fmt.Sprintf("%s%s:%-*d|%s ", cIndex, lineStr, padCol, colDisplay+1, cReset)
 		} else {
-			prefix = fmt.Sprintf("%s%d:%s ", cIndex, index, cReset)
+			spacePadding := ""
+			if padCol > 0 {
+				spacePadding = strings.Repeat(" ", padCol)
+			}
+
+			prefix = fmt.Sprintf("%s%s:%s|%s ", cIndex, lineStr, spacePadding, cReset)
 		}
 	}
 
@@ -53,7 +61,7 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 	headerPrinted := false
 
 	if !headerPrinted && displayName != "" {
-		fmt.Fprintf(w, "--- File: %s ---\n", displayName)
+		fmt.Fprintf(w, "\n--- File: %s ---\n\n", displayName)
 		headerPrinted = true
 	}
 
