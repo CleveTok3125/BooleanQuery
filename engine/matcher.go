@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"bytes"
 	"sort"
 	"strings"
 	"unicode"
@@ -91,6 +92,15 @@ func (engine *Engine) containAnyCheckOnly(terms []string, text string) int {
 	return -1
 }
 
+func (engine *Engine) containAnyCheckOnlyBytes(list []string, text []byte) int {
+	for i, term := range list {
+		if bytes.Contains(text, []byte(term)) {
+			return i
+		}
+	}
+	return -1
+}
+
 func (engine *Engine) containAny(terms []string, text string) [][2]int {
 	matchText := text
 	if engine.Config.IgnoreCase {
@@ -132,6 +142,15 @@ func (engine *Engine) containAllCheckOnly(terms []string, text string) bool {
 
 		start, _ := engine.findTermIndex(matchText, matchTerm, 0)
 		if start == -1 {
+			return false
+		}
+	}
+	return true
+}
+
+func (engine *Engine) containAllCheckOnlyBytes(list []string, text []byte) bool {
+	for _, term := range list {
+		if !bytes.Contains(text, []byte(term)) {
 			return false
 		}
 	}
@@ -186,6 +205,18 @@ func (engine *Engine) containOrderedCheckOnly(terms []string, text string) bool 
 	return true
 }
 
+func (engine *Engine) containOrderedCheckOnlyBytes(list []string, text []byte) bool {
+	currentIdx := 0
+	for _, term := range list {
+		idx := bytes.Index(text[currentIdx:], []byte(term))
+		if idx == -1 {
+			return false
+		}
+		currentIdx += idx + len(term)
+	}
+	return true
+}
+
 func (engine *Engine) containOrdered(terms []string, text string) [][2]int {
 	matchText := text
 	if engine.Config.IgnoreCase {
@@ -213,6 +244,32 @@ func (engine *Engine) containOrdered(terms []string, text string) [][2]int {
 	}
 
 	return matches
+}
+
+func (engine *Engine) CheckOnlyBytes(text []byte) bool {
+	if engine.containAnyCheckOnlyBytes(engine.searchTerm.blackList, text) != -1 {
+		return false
+	}
+
+	if len(engine.searchTerm.orderedList) > 0 {
+		if !engine.containOrderedCheckOnlyBytes(engine.searchTerm.orderedList, text) {
+			return false
+		}
+	}
+
+	if len(engine.searchTerm.whiteList) > 0 {
+		if !engine.containAllCheckOnlyBytes(engine.searchTerm.whiteList, text) {
+			return false
+		}
+	}
+
+	if len(engine.searchTerm.greyList) > 0 {
+		if engine.containAnyCheckOnlyBytes(engine.searchTerm.greyList, text) == -1 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (engine *Engine) Search(text string) [][2]int {

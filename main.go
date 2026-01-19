@@ -2,6 +2,7 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"BooleanQuery/app"
 	"BooleanQuery/engine"
@@ -12,9 +13,6 @@ func main() {
 
 	e := engine.New()
 
-	e.Config.BufferMaxSize = 1024 * 1024
-	e.Config.BufferSize = 64 * 1024
-
 	app.ApplyConfigToEngine(e)
 
 	if err := e.SetSearchTerm(app.GetQuery()); err != nil {
@@ -22,5 +20,11 @@ func main() {
 	}
 	e.Classify()
 
-	app.Run(e)
+	found := app.Run(e)
+
+	if found {
+		os.Exit(0)
+	} else {
+		os.Exit(1)
+	}
 }

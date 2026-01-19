@@ -13,7 +13,7 @@ import (
 	"BooleanQuery/engine"
 )
 
-func Run(e *engine.Engine) {
+func Run(e *engine.Engine) bool {
 	watchTerminalSize()
 
 	c := make(chan os.Signal, 1)
@@ -35,20 +35,25 @@ func Run(e *engine.Engine) {
 	stdoutWriter := bufio.NewWriter(os.Stdout)
 	defer stdoutWriter.Flush()
 
+	globalFound := false
+
 	if len(cli.Files) <= 1 || cli.Stream {
 		if len(cli.Files) == 0 {
-			processInput(stdoutWriter, e, os.Stdin, "")
-			return
+			return processInput(stdoutWriter, e, os.Stdin, "")
 		}
 
 		for _, path := range cli.Files {
-			if err := processFile(stdoutWriter, e, path); err != nil {
+			found, err := processFile(stdoutWriter, e, path)
+			if err != nil {
 				stdoutWriter.Flush()
 				fmt.Fprintf(os.Stderr, "Error opening %s: %v\n", path, err)
 			}
+			if found {
+				globalFound = true
+			}
 			stdoutWriter.Flush()
 		}
-		return
+		return globalFound
 	}
 
 	numCPU := runtime.NumCPU()
@@ -56,6 +61,8 @@ func Run(e *engine.Engine) {
 	var wg sync.WaitGroup
 
 	tempResults := make([]string, len(cli.Files))
+
+	var foundLock sync.Mutex
 
 	for i, path := range cli.Files {
 		wg.Add(1)
@@ -76,6 +83,10 @@ func Run(e *engine.Engine) {
 
 			if hasContent {
 				tempResults[idx] = tmpPath
+
+				foundLock.Lock()
+				globalFound = true
+				foundLock.Unlock()
 			} else {
 				os.Remove(tmpPath)
 				tempResults[idx] = ""
@@ -99,4 +110,6 @@ func Run(e *engine.Engine) {
 		os.Remove(tmpPath)
 		stdoutWriter.Flush()
 	}
+
+	return globalFound
 }

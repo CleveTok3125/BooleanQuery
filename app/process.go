@@ -3,10 +3,11 @@ package app
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"io"
 	"os"
-	"strings"
+	"strconv"
 
 	"BooleanQuery/engine"
 )
@@ -16,26 +17,30 @@ type lineInfo struct {
 	text  string
 }
 
-func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part string, filename string) {
-	cIndex := engine.ColorBrightBlack
-	cReset := engine.ColorReset
-	cFile := engine.ColorMagenta
-
-	if e.Config.NoColor {
-		cIndex = ""
-		cReset = ""
-		cFile = ""
+func writePadding(buf *bytes.Buffer, count int) {
+	for range count {
+		buf.WriteByte(' ')
 	}
+}
 
-	prefix := ""
-	filePrefix := ""
+func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part string, cachedFilePrefix []byte, buf *bytes.Buffer) {
+	buf.Reset()
 
-	if filename != "" && cli.ShowFilePrefix {
-		filePrefix = fmt.Sprintf("%s%s%s:", cFile, filename, cReset)
+	if len(cachedFilePrefix) > 0 {
+		buf.Write(cachedFilePrefix)
 	}
 
 	if !cli.NoIndex {
-		lineStr := fmt.Sprintf("%*d", padLine, index+1)
+		if !e.Config.NoColor {
+			buf.WriteString(engine.ColorBrightBlack)
+		}
+
+		lineStr := strconv.Itoa(index + 1)
+
+		if len(lineStr) < padLine {
+			writePadding(buf, padLine-len(lineStr))
+		}
+		buf.WriteString(lineStr)
 
 		colDisplay := -1
 		if len(matches) > 0 {
@@ -43,94 +48,129 @@ func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part 
 		}
 
 		if colDisplay != -1 {
-			prefix = fmt.Sprintf("%s%s%s:%-*d|%s ", filePrefix, cIndex, lineStr, padCol, colDisplay+1, cReset)
-		} else {
-			spacePadding := ""
-			if padCol > 0 {
-				spacePadding = strings.Repeat(" ", padCol)
-			}
+			buf.WriteByte(':')
+			colStr := strconv.Itoa(colDisplay + 1)
+			buf.WriteString(colStr)
 
-			prefix = fmt.Sprintf("%s%s%s:%s|%s ", filePrefix, cIndex, lineStr, spacePadding, cReset)
+			if len(colStr) < padCol {
+				writePadding(buf, padCol-len(colStr))
+			}
+			buf.WriteByte('|')
+		} else {
+			buf.WriteByte(':')
+			writePadding(buf, padCol)
+			buf.WriteByte('|')
 		}
-	} else if filePrefix != "" {
-		prefix = filePrefix + " "
+
+		buf.WriteByte(' ')
+
+		if !e.Config.NoColor {
+			buf.WriteString(engine.ColorReset)
+		}
 	}
 
-	printText := e.Highlight(part, matches)
+	e.HighlightTo(buf, part, matches)
+	buf.WriteByte('\n')
 
-	fmt.Fprintf(w, "%s%s\n", prefix, printText)
+	w.Write(buf.Bytes())
 }
 
-func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName string) {
+func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName string) bool {
 	combinedFlag := engine.CombineFlags(engine.CHARSEP)
+
+	shouldPrintHeader := !cli.NoFileHeader && len(cli.Files) > 1
+
+	var cachedFilePrefix []byte
+	if displayName != "" && cli.ShowFilePrefix {
+		tmp := bytes.NewBuffer(make([]byte, 0, 100))
+		if !e.Config.NoColor {
+			tmp.WriteString(engine.ColorMagenta)
+		}
+		tmp.WriteString(displayName)
+		if !e.Config.NoColor {
+			tmp.WriteString(engine.ColorReset)
+		}
+		tmp.WriteByte(':')
+		cachedFilePrefix = tmp.Bytes()
+	}
 
 	var beforeBuffer []lineInfo
 	linesToPrintAfter := 0
 	lastPrintedIndex := -1
-
 	headerPrinted := false
+
+	foundAnyMatch := false
+
+	printBuf := bytes.NewBuffer(make([]byte, 0, e.Config.BufferSize))
 
 	iter := e.ProcessStream(reader, combinedFlag, displayName)
 
-	iter(func(index int, part string) bool {
-		matches := e.Search(part)
+	iter(func(index int, partBytes []byte) bool {
+		if !e.CheckOnlyBytes(partBytes) {
+			if linesToPrintAfter > 0 || cli.Before > 0 {
+				partStr := string(partBytes)
 
-		if matches != nil {
-			shouldPrintHeader := !cli.NoFileHeader && len(cli.Files) > 1
+				if linesToPrintAfter > 0 {
+					if index > lastPrintedIndex {
+						printLine(w, e, index, nil, partStr, cachedFilePrefix, printBuf)
+						lastPrintedIndex = index
+					}
+					linesToPrintAfter--
+				}
 
-			if shouldPrintHeader && !headerPrinted && displayName != "" {
-				fmt.Fprintf(w, "\n--- File: %s ---\n\n", displayName)
-				headerPrinted = true
-			}
-
-			for _, item := range beforeBuffer {
-				if item.index > lastPrintedIndex {
-					printLine(w, e, item.index, nil, item.text, displayName)
-					lastPrintedIndex = item.index
+				if cli.Before > 0 {
+					beforeBuffer = append(beforeBuffer, lineInfo{index, partStr})
+					if len(beforeBuffer) > cli.Before {
+						beforeBuffer = beforeBuffer[1:]
+					}
 				}
 			}
 
-			printLine(w, e, index, matches, part, displayName)
-			lastPrintedIndex = index
+			return true
+		}
 
-			beforeBuffer = nil
-			linesToPrintAfter = cli.After
+		foundAnyMatch = true
 
-		} else {
-			if linesToPrintAfter > 0 {
-				if index > lastPrintedIndex {
-					printLine(w, e, index, nil, part, displayName)
-					lastPrintedIndex = index
-				}
-				linesToPrintAfter--
-			}
+		part := string(partBytes)
 
-			if cli.Before > 0 {
-				beforeBuffer = append(beforeBuffer, lineInfo{index, part})
+		var matches [][2]int
+		if !e.Config.NoColor {
+			matches = e.Search(part)
+		}
 
-				if len(beforeBuffer) > cli.Before {
-					beforeBuffer = beforeBuffer[1:]
-				}
+		if shouldPrintHeader && !headerPrinted && displayName != "" {
+			fmt.Fprintf(w, "\n--- File: %s ---\n\n", displayName)
+			headerPrinted = true
+		}
+
+		for _, item := range beforeBuffer {
+			if item.index > lastPrintedIndex {
+				printLine(w, e, item.index, nil, item.text, cachedFilePrefix, printBuf)
+				lastPrintedIndex = item.index
 			}
 		}
+
+		printLine(w, e, index, matches, part, cachedFilePrefix, printBuf)
+		lastPrintedIndex = index
+
+		beforeBuffer = nil
+		linesToPrintAfter = cli.After
+
 		return true
 	})
+
+	return foundAnyMatch
 }
 
-func getDisplayName(path string) string {
-	return path
-}
-
-func processFile(w io.Writer, e *engine.Engine, path string) error {
+func processFile(w io.Writer, e *engine.Engine, path string) (bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer f.Close()
 
-	displayName := getDisplayName(path)
-	processInput(w, e, f, displayName)
-	return nil
+	found := processInput(w, e, f, path)
+	return found, nil
 }
 
 func processFileToTemp(e *engine.Engine, path string) (string, bool, error) {
@@ -148,8 +188,7 @@ func processFileToTemp(e *engine.Engine, path string) (string, bool, error) {
 
 	bufWriter := bufio.NewWriter(tmpFile)
 
-	displayName := getDisplayName(path)
-	processInput(bufWriter, e, f, displayName)
+	processInput(bufWriter, e, f, path)
 
 	bufWriter.Flush()
 

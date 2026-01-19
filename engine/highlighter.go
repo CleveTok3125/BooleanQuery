@@ -1,13 +1,15 @@
 package engine
 
-import "strings"
+import (
+	"bytes"
+)
 
 func mergeIntervals(matches [][2]int) [][2]int {
 	if len(matches) <= 1 {
 		return matches
 	}
 
-	var result [][2]int
+	result := make([][2]int, 0, len(matches))
 	current := matches[0]
 
 	for i := 1; i < len(matches); i++ {
@@ -26,41 +28,42 @@ func mergeIntervals(matches [][2]int) [][2]int {
 	return result
 }
 
-func (engine *Engine) Highlight(text string, matches [][2]int) string {
+func (engine *Engine) HighlightTo(buf *bytes.Buffer, text string, matches [][2]int) {
 	if engine.Config.NoColor || len(matches) == 0 {
-		return text
+		buf.WriteString(text)
+		return
 	}
 
 	mergedMatches := mergeIntervals(matches)
 
-	var sb strings.Builder
 	cursor := 0
+	textLen := len(text)
 
 	for _, match := range mergedMatches {
 		start, end := match[0], match[1]
 
-		if start > len(text) {
-			start = len(text)
+		if start > textLen {
+			start = textLen
 		}
-		if end > len(text) {
-			end = len(text)
+		if end > textLen {
+			end = textLen
 		}
 		if start < cursor {
 			start = cursor
 		}
 
-		sb.WriteString(text[cursor:start])
+		if start > cursor {
+			buf.WriteString(text[cursor:start])
+		}
 
-		sb.WriteString(ColorRed)
-		sb.WriteString(text[start:end])
-		sb.WriteString(ColorReset)
+		buf.WriteString(ColorRed)
+		buf.WriteString(text[start:end])
+		buf.WriteString(ColorReset)
 
 		cursor = end
 	}
 
-	if cursor < len(text) {
-		sb.WriteString(text[cursor:])
+	if cursor < textLen {
+		buf.WriteString(text[cursor:])
 	}
-
-	return sb.String()
 }
