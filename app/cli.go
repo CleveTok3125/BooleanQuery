@@ -10,19 +10,21 @@ var cli struct {
 	Query string   `arg:"" help:"Search query string"`
 	Files []string `arg:"" optional:"" type:"path" help:"File paths to search. Reads from stdin if empty."`
 
-	// Config flags
-	CharSep    string `help:"Separator for splitting lines."`
-	IgnoreCase bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
-	ExactWord  bool   `help:"Match exact words only." default:"false"`
-	NoColor    bool   `help:"Disable colored output." default:"false"`
-	NoIndex    bool   `help:"Disable index numbers in output." default:"false"`
-	NoFilename bool   `help:"Disable file name prefix." default:"false"`
+	CharSep        string `help:"Separator for splitting lines." default:"\n"`
+	IgnoreCase     bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
+	ExactWord      bool   `help:"Match exact words only." default:"false"`
+	NoColor        bool   `help:"Disable colored output." default:"false"`
+	NoIndex        bool   `help:"Disable index numbers in output." default:"false"`
+	NoFileHeader   bool   `help:"Disable file header." default:"false"`
+	ShowFilePrefix bool   `help:"Show file path in prefix." default:"false"`
 
 	Stream bool `help:"Force sequential processing (single-threaded) and print immediately." default:"false"`
 
 	After   int `short:"A" help:"Print N lines after match."`
 	Before  int `short:"B" help:"Print N lines before match."`
 	Context int `short:"C" help:"Print N lines before and after match."`
+
+	AllowBinary bool `help:"Process binary files (skip binary lines instead of stopping)." default:"false"`
 }
 
 func ParseCLI() {
@@ -43,6 +45,5 @@ func ApplyConfigToEngine(e *engine.Engine) {
 	e.Config.IgnoreCase = cli.IgnoreCase
 	e.Config.ExactWord = cli.ExactWord
 	e.Config.NoColor = cli.NoColor
-	e.Config.NoIndex = cli.NoIndex
-	e.Config.NoFilename = cli.NoFilename
+	e.Config.AllowBinary = cli.AllowBinary
 }

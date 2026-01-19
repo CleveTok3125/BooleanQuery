@@ -94,8 +94,9 @@ in the temporary directory.
 
 ## ToDo
 
-* [ ] **Recursive Search**: Support for scanning directories recursively.
-* [ ] **Binary File Detection**:
+* ~~[ ] **Recursive Search**: Support for scanning directories recursively.~~
+    Alternative solutions such as `find` and `shell grobbing` exist.
+* [x] **Binary File Detection**:
 Automatically detect and skip binary files to prevent terminal corruption.
 * [ ] Add `-c` (`--count`) flag to print only the count of matching lines.
 * [ ] Add (`--count-files`) flag to print only matched files.

@@ -9,6 +9,7 @@ const (
 
 const (
 	ColorRed         = "\033[31m"
+	ColorMagenta     = "\033[35m"
 	ColorBrightBlack = "\033[0;90;49m"
 	ColorReset       = "\033[0m"
 )
@@ -20,8 +21,7 @@ type Config struct {
 	IgnoreCase    bool
 	ExactWord     bool
 	NoColor       bool
-	NoIndex       bool
-	NoFilename    bool
+	AllowBinary   bool
 }
 
 func CombineFlags(flags ...IntFlag) IntFlag {
