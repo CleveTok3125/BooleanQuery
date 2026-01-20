@@ -247,6 +247,10 @@ func (engine *Engine) containOrdered(terms []string, text string) [][2]int {
 }
 
 func (engine *Engine) CheckOnlyBytes(text []byte) bool {
+	if engine.Config.IgnoreCase {
+		text = bytes.ToLower(text)
+	}
+
 	if engine.containAnyCheckOnlyBytes(engine.searchTerm.blackList, text) != -1 {
 		return false
 	}

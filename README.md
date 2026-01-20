@@ -88,6 +88,10 @@ if it's a valid query prefix.
   * `"+-example"` will find strings containing `-example`
   * `"-+example"` will find strings NOT containing `+example`
 
+* Using a NOT query (`-`) at the beginning of a query string
+can cause the parser to misinterpret it as an argument.\
+    This can be fixed by placing it after or grouping it with `'` (single quotes).
+
 * To ensure the print order in parallel processing,
 a disk buffer will be used and temporary file generated will be stored
 in the temporary directory.

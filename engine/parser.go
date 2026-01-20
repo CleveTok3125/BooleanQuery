@@ -2,6 +2,8 @@
 package engine
 
 import (
+	"strings"
+
 	"mvdan.cc/sh/v3/shell"
 )
 
@@ -40,10 +42,18 @@ func (engine *Engine) Classify() {
 		firstChar := string(runes[0])
 		rest := string(runes[1:])
 
+		if engine.Config.IgnoreCase {
+			rest = strings.ToLower(rest)
+		}
+
 		if list, ok := lists[firstChar]; ok {
 			*list = append(*list, rest)
 		} else {
-			engine.searchTerm.whiteList = append(engine.searchTerm.whiteList, term)
+			termToAdd := term
+			if engine.Config.IgnoreCase {
+				termToAdd = strings.ToLower(term)
+			}
+			engine.searchTerm.whiteList = append(engine.searchTerm.whiteList, termToAdd)
 		}
 
 	}
