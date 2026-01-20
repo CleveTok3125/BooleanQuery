@@ -78,7 +78,7 @@ func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part 
 func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName string) bool {
 	combinedFlag := engine.CombineFlags(engine.CHARSEP)
 
-	shouldPrintHeader := !cli.NoFileHeader && len(cli.Files) > 1
+	shouldPrintHeader := !cli.NoFileHeader && len(cli.Files) > 1 && !cli.Count
 
 	var cachedFilePrefix []byte
 	if displayName != "" && cli.ShowFilePrefix {
@@ -100,6 +100,7 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 	headerPrinted := false
 
 	foundAnyMatch := false
+	matchCount := 0
 
 	printBuf := bytes.NewBuffer(make([]byte, 0, e.Config.BufferSize))
 
@@ -107,7 +108,7 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 
 	iter(func(index int, partBytes []byte) bool {
 		if !e.CheckOnlyBytes(partBytes) {
-			if linesToPrintAfter > 0 || cli.Before > 0 {
+			if !cli.Count && (linesToPrintAfter > 0 || cli.Before > 0) {
 				partStr := string(partBytes)
 
 				if linesToPrintAfter > 0 {
@@ -130,6 +131,17 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 		}
 
 		foundAnyMatch = true
+
+		if cli.FilesWithMatches {
+			fmt.Fprintln(w, displayName)
+			return false
+		}
+
+		matchCount++
+
+		if cli.Count {
+			return true
+		}
 
 		part := string(partBytes)
 
@@ -158,6 +170,18 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 
 		return true
 	})
+
+	if cli.Count {
+		if displayName != "" && (len(cli.Files) > 1 || cli.ShowFilePrefix) {
+			if !e.Config.NoColor {
+				fmt.Fprintf(w, "%s%s%s:%d\n", engine.ColorMagenta, displayName, engine.ColorReset, matchCount)
+			} else {
+				fmt.Fprintf(w, "%s:%d\n", displayName, matchCount)
+			}
+		} else {
+			fmt.Fprintf(w, "%d\n", matchCount)
+		}
+	}
 
 	return foundAnyMatch
 }
