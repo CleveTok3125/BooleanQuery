@@ -23,7 +23,7 @@ func writePadding(buf *bytes.Buffer, count int) {
 	}
 }
 
-func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part string, cachedFilePrefix []byte, buf *bytes.Buffer) {
+func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part string, cachedFilePrefix []byte, buf *bytes.Buffer) error {
 	buf.Reset()
 
 	if len(cachedFilePrefix) > 0 {
@@ -72,7 +72,11 @@ func printLine(w io.Writer, e *engine.Engine, index int, matches [][2]int, part 
 	e.HighlightTo(buf, part, matches)
 	buf.WriteByte('\n')
 
-	w.Write(buf.Bytes())
+	_, err := w.Write(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName string) bool {
@@ -104,16 +108,16 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 
 	printBuf := bytes.NewBuffer(make([]byte, 0, e.Config.BufferSize))
 
-	iter := e.ProcessStream(reader, combinedFlag, displayName)
+	iter := e.ProcessStream(reader, combinedFlag)
 
-	iter(func(index int, partBytes []byte) bool {
+	err := iter(func(index int, partBytes []byte) bool {
 		if !e.CheckOnlyBytes(partBytes) {
 			if !cli.Count && (linesToPrintAfter > 0 || cli.Before > 0) {
 				partStr := string(partBytes)
 
 				if linesToPrintAfter > 0 {
 					if index > lastPrintedIndex {
-						printLine(w, e, index, nil, partStr, cachedFilePrefix, printBuf)
+						_ = printLine(w, e, index, nil, partStr, cachedFilePrefix, printBuf)
 						lastPrintedIndex = index
 					}
 					linesToPrintAfter--
@@ -133,8 +137,7 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 		foundAnyMatch = true
 
 		if cli.FilesWithMatches {
-			fmt.Fprintln(w, displayName)
-			return false
+			_, _ = fmt.Fprintln(w, displayName)
 		}
 
 		matchCount++
@@ -151,18 +154,18 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 		}
 
 		if shouldPrintHeader && !headerPrinted && displayName != "" {
-			fmt.Fprintf(w, "\n--- File: %s ---\n\n", displayName)
+			_, _ = fmt.Fprintf(w, "\n--- File: %s ---\n\n", displayName)
 			headerPrinted = true
 		}
 
 		for _, item := range beforeBuffer {
 			if item.index > lastPrintedIndex {
-				printLine(w, e, item.index, nil, item.text, cachedFilePrefix, printBuf)
+				_ = printLine(w, e, item.index, nil, item.text, cachedFilePrefix, printBuf)
 				lastPrintedIndex = item.index
 			}
 		}
 
-		printLine(w, e, index, matches, part, cachedFilePrefix, printBuf)
+		_ = printLine(w, e, index, matches, part, cachedFilePrefix, printBuf)
 		lastPrintedIndex = index
 
 		beforeBuffer = nil
@@ -170,16 +173,31 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 
 		return true
 	})
+	if err != nil && !cli.NoWarn {
+		name := displayName
+		if name == "" {
+			name = "{stdin}"
+		}
+
+		switch err {
+		case engine.ErrBinaryFile:
+			fmt.Fprintf(os.Stderr, "Binary file detected: %s\n", name)
+		case bufio.ErrTooLong:
+			fmt.Fprintf(os.Stderr, "\nSkipped: The data is too long, exceeding the threshold of %d bytes (Binary file or stream is too large).\n", e.Config.BufferMaxSize)
+		default:
+			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", name, err)
+		}
+	}
 
 	if cli.Count {
 		if displayName != "" && (len(cli.Files) > 1 || cli.ShowFilePrefix) {
 			if !e.Config.NoColor {
-				fmt.Fprintf(w, "%s%s%s:%d\n", engine.ColorMagenta, displayName, engine.ColorReset, matchCount)
+				_, _ = fmt.Fprintf(w, "%s%s%s:%d\n", engine.ColorMagenta, displayName, engine.ColorReset, matchCount)
 			} else {
-				fmt.Fprintf(w, "%s:%d\n", displayName, matchCount)
+				_, _ = fmt.Fprintf(w, "%s:%d\n", displayName, matchCount)
 			}
 		} else {
-			fmt.Fprintf(w, "%d\n", matchCount)
+			_, _ = fmt.Fprintf(w, "%d\n", matchCount)
 		}
 	}
 
@@ -191,7 +209,7 @@ func processFile(w io.Writer, e *engine.Engine, path string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	found := processInput(w, e, f, path)
 	return found, nil
@@ -202,19 +220,19 @@ func processFileToTemp(e *engine.Engine, path string) (string, bool, error) {
 	if err != nil {
 		return "", false, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	tmpFile, err := os.CreateTemp("", "bq-buffer-*")
 	if err != nil {
 		return "", false, err
 	}
-	defer tmpFile.Close()
+	defer func() { _ = tmpFile.Close() }()
 
 	bufWriter := bufio.NewWriter(tmpFile)
 
 	processInput(bufWriter, e, f, path)
 
-	bufWriter.Flush()
+	_ = bufWriter.Flush()
 
 	stat, _ := tmpFile.Stat()
 	hasContent := stat.Size() > 0

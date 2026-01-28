@@ -3,14 +3,12 @@ package engine
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"io"
-	"os"
 	"unicode"
 )
 
-func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag, streamName string) func(func(int, []byte) bool) {
-	return func(yield func(int, []byte) bool) {
+func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag) func(func(int, []byte) bool) error {
+	return func(yield func(int, []byte) bool) error {
 		scanner := bufio.NewScanner(input)
 
 		buf := make([]byte, 0, engine.Config.BufferSize)
@@ -61,12 +59,7 @@ func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag, strea
 				if engine.Config.AllowBinary {
 					continue
 				} else {
-					displayName := streamName
-					if displayName == "" {
-						displayName = "(stdin)"
-					}
-					fmt.Fprintf(os.Stderr, "Binary file detected: %s\n", displayName)
-					return
+					return ErrBinaryFile
 				}
 			}
 
@@ -84,32 +77,29 @@ func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag, strea
 					end := bytes.IndexFunc(remaining, unicode.IsSpace)
 					if end == -1 {
 						if !yield(currentIndex, remaining) {
-							return
+							return nil
 						}
 						currentIndex++
 						break
 					}
 
 					if !yield(currentIndex, remaining[:end]) {
-						return
+						return nil
 					}
 					currentIndex++
 					remaining = remaining[end:]
 				}
 			} else {
 				if !yield(currentIndex, part) {
-					return
+					return nil
 				}
 				currentIndex++
 			}
 		}
 
 		if err := scanner.Err(); err != nil {
-			if err == bufio.ErrTooLong {
-				fmt.Fprintf(os.Stderr, "\nSkipped: The data is too long, exceeding the threshold of %d bytes (Binary file or stream is too large).\n", engine.Config.BufferMaxSize)
-			} else {
-				fmt.Fprintf(os.Stderr, "Error reading: %v\n", err)
-			}
+			return err
 		}
+		return nil
 	}
 }

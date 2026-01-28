@@ -19,6 +19,7 @@ var cli struct {
 	ShowFilePrefix   bool   `short:"f" help:"Show file path in prefix." default:"false"`
 	FilesWithMatches bool   `short:"F" help:"Print only names of matched files."`
 	Count            bool   `short:"l" help:"Print a count of matched lines per file."`
+	NoWarn           bool   `help:"Suppress warning messages."`
 
 	Stream bool `help:"Force sequential processing (single-threaded) and print immediately." default:"false"`
 
