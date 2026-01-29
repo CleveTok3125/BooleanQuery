@@ -10,16 +10,18 @@ var cli struct {
 	Query string   `arg:"" help:"Search query string"`
 	Files []string `arg:"" optional:"" type:"path" help:"File paths to search. Reads from stdin if empty."`
 
-	CharSep          string `short:"c" help:"Separator for splitting lines." default:"\n"`
-	IgnoreCase       bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
-	ExactWord        bool   `short:"w" help:"Match exact words only." default:"false"`
-	NoColor          bool   `help:"Disable colored output." default:"false"`
-	NoIndex          bool   `help:"Disable index numbers in output." default:"false"`
-	NoFileHeader     bool   `help:"Disable file header." default:"false"`
-	ShowFilePrefix   bool   `short:"f" help:"Show file path in prefix." default:"false"`
-	FilesWithMatches bool   `short:"F" help:"Print only names of matched files."`
-	Count            bool   `short:"l" help:"Print a count of matched lines per file."`
-	NoWarn           bool   `help:"Suppress warning messages."`
+	CharSep    string `short:"c" help:"Separator for splitting lines." default:"\n"`
+	IgnoreCase bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
+	ExactWord  bool   `short:"w" help:"Match exact words only." default:"false"`
+	Wildcard   bool   `short:"W" help:"Enable wildcard matching (* and ?). Disables exact word match." default:"false"`
+
+	NoColor          bool `help:"Disable colored output." default:"false"`
+	NoIndex          bool `help:"Disable index numbers in output." default:"false"`
+	NoFileHeader     bool `help:"Disable file header." default:"false"`
+	ShowFilePrefix   bool `short:"f" help:"Show file path in prefix." default:"false"`
+	FilesWithMatches bool `short:"F" help:"Print only names of matched files."`
+	Count            bool `short:"l" help:"Print a count of matched lines per file."`
+	NoWarn           bool `help:"Suppress warning messages."`
 
 	Stream bool `help:"Force sequential processing (single-threaded) and print immediately." default:"false"`
 
@@ -48,6 +50,8 @@ func ApplyConfigToEngine(e *engine.Engine) {
 	e.Config.CharSep = cli.CharSep
 	e.Config.IgnoreCase = cli.IgnoreCase
 	e.Config.ExactWord = cli.ExactWord
+	e.Config.Wildcard = cli.Wildcard
+
 	e.Config.NoColor = cli.NoColor
 	e.Config.AllowBinary = cli.AllowBinary
 

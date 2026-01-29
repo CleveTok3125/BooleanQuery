@@ -3,9 +3,80 @@ package engine
 import (
 	"bytes"
 	"sort"
-	"strings"
 	"unicode"
 )
+
+func indexWithQuestionMark(s, sub []byte) int {
+	if bytes.IndexByte(sub, WildcardZero) == -1 {
+		return bytes.Index(s, sub)
+	}
+
+	n := len(sub)
+	if n == 0 {
+		return 0
+	}
+	if n > len(s) {
+		return -1
+	}
+
+	for i := 0; i <= len(s)-n; i++ {
+		match := true
+		for j := range n {
+			if sub[j] != WildcardZero && sub[j] != s[i+j] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return i
+		}
+	}
+	return -1
+}
+
+func (engine *Engine) findWildcardInterval(text []byte, term Term) (int, int) {
+	if len(term.Segments) == 0 {
+		return 0, len(text)
+	}
+
+	startIndex := -1
+	currentPos := 0
+
+	for _, segment := range term.Segments {
+		if len(segment) == 0 {
+			continue
+		}
+
+		idx := indexWithQuestionMark(text[currentPos:], segment)
+		if idx == -1 {
+			return -1, -1
+		}
+
+		realIdx := currentPos + idx
+
+		if startIndex == -1 {
+			startIndex = realIdx
+		}
+
+		currentPos = realIdx + len(segment)
+	}
+
+	finalEnd := currentPos
+	finalStart := startIndex
+
+	if len(term.Bytes) > 0 && term.Bytes[0] == '*' {
+		finalStart = 0
+	}
+	if len(term.Bytes) > 0 && term.Bytes[len(term.Bytes)-1] == '*' {
+		finalEnd = len(text)
+	}
+
+	if startIndex == -1 {
+		return 0, len(text)
+	}
+
+	return finalStart, finalEnd
+}
 
 func isBoundaryChar(text string, pos int) bool {
 	if pos < 0 || pos >= len(text) {
@@ -15,48 +86,102 @@ func isBoundaryChar(text string, pos int) bool {
 	return !unicode.IsLetter(r) && !unicode.IsNumber(r) && r != '_'
 }
 
-func (engine *Engine) findAllTermIndices(text string, term string) [][2]int {
+func (engine *Engine) findAllTermIndices(text string, term Term) [][2]int {
 	var matches [][2]int
-	currentIdx := 0
-	termLen := len(term)
+	var searchBytes []byte
+	textBytes := []byte(text)
 
-	for {
-		idx := strings.Index(text[currentIdx:], term)
-		if idx == -1 {
-			break
-		}
+	if engine.Config.IgnoreCase {
+		searchBytes = bytes.ToLower(textBytes)
+	} else {
+		searchBytes = textBytes
+	}
 
-		realStart := currentIdx + idx
-		realEnd := realStart + termLen
+	currentOffset := 0
 
-		isValid := true
-		if engine.Config.ExactWord {
-			if !isBoundaryChar(text, realStart-1) || !isBoundaryChar(text, realEnd) {
-				isValid = false
+	for currentOffset < len(searchBytes) {
+		var start, end int
+		if term.HasWildcard {
+			s, e := engine.findWildcardInterval(searchBytes[currentOffset:], term)
+			if s == -1 {
+				break
+			}
+			start = s
+			end = e
+		} else {
+			idx := bytes.Index(searchBytes[currentOffset:], term.Bytes)
+			if idx == -1 {
+				break
+			}
+			start = idx
+			end = idx + len(term.Bytes)
+
+			realStart := currentOffset + start
+			realEnd := currentOffset + end
+			if engine.Config.ExactWord {
+				if !isBoundaryChar(text, realStart-1) || !isBoundaryChar(text, realEnd) {
+					currentOffset = realStart + 1
+					continue
+				}
 			}
 		}
 
-		if isValid {
-			matches = append(matches, [2]int{realStart, realEnd})
-		}
+		realStart := currentOffset + start
+		realEnd := currentOffset + end
 
-		currentIdx = realStart + 1
+		matches = append(matches, [2]int{realStart, realEnd})
+
+		if realEnd > currentOffset {
+			currentOffset = realEnd
+		} else {
+			currentOffset++
+		}
 	}
+
 	return matches
 }
 
-func (engine *Engine) findTermIndex(text string, term string, startIdx int) (int, int) {
+func (engine *Engine) findTermIndex(text string, term Term, startIdx int) (int, int) {
+	if startIdx >= len(text) {
+		return -1, -1
+	}
+
+	var searchBytes []byte
+	textBytes := []byte(text)
+
+	if engine.Config.IgnoreCase {
+		searchBytes = bytes.ToLower(textBytes)
+	} else {
+		searchBytes = textBytes
+	}
+
+	if startIdx >= len(searchBytes) {
+		return -1, -1
+	}
+
 	currentIdx := startIdx
-	termLen := len(term)
 
 	for {
-		idx := strings.Index(text[currentIdx:], term)
-		if idx == -1 {
-			return -1, -1
+		var start, end int
+
+		if term.HasWildcard {
+			s, e := engine.findWildcardInterval(searchBytes[currentIdx:], term)
+			if s == -1 {
+				return -1, -1
+			}
+			start = s
+			end = e
+		} else {
+			idx := bytes.Index(searchBytes[currentIdx:], term.Bytes)
+			if idx == -1 {
+				return -1, -1
+			}
+			start = idx
+			end = idx + len(term.Bytes)
 		}
 
-		realStart := currentIdx + idx
-		realEnd := realStart + termLen
+		realStart := currentIdx + start
+		realEnd := currentIdx + end
 
 		if !engine.Config.ExactWord {
 			return realStart, realEnd
@@ -67,55 +192,33 @@ func (engine *Engine) findTermIndex(text string, term string, startIdx int) (int
 		}
 
 		currentIdx = realStart + 1
+		if currentIdx >= len(searchBytes) {
+			return -1, -1
+		}
 	}
 }
 
-func (engine *Engine) containAnyCheckOnly(terms []string, text string) int {
-	matchText := text
-	if engine.Config.IgnoreCase {
-		matchText = strings.ToLower(text)
-	}
-
-	for _, term := range terms {
-		matchTerm := term
-
-		if engine.Config.IgnoreCase {
-			matchTerm = strings.ToLower(term)
-		}
-
-		start, _ := engine.findTermIndex(matchText, matchTerm, 0)
-		if start != -1 {
-			return start
-		}
-	}
-
-	return -1
-}
-
-func (engine *Engine) containAnyCheckOnlyBytes(list []string, text []byte) int {
+func (engine *Engine) containAnyCheckOnlyBytes(list []Term, text []byte) int {
 	for i, term := range list {
-		if bytes.Contains(text, []byte(term)) {
-			return i
+		if term.HasWildcard {
+			start, _ := engine.findWildcardInterval(text, term)
+			if start != -1 {
+				return i
+			}
+		} else {
+			if bytes.Contains(text, term.Bytes) {
+				return i
+			}
 		}
 	}
 	return -1
 }
 
-func (engine *Engine) containAny(terms []string, text string) [][2]int {
-	matchText := text
-	if engine.Config.IgnoreCase {
-		matchText = strings.ToLower(text)
-	}
-
+func (engine *Engine) containAny(terms []Term, text string) [][2]int {
 	var matches [][2]int
 
 	for _, term := range terms {
-		matchTerm := term
-		if engine.Config.IgnoreCase {
-			matchTerm = strings.ToLower(term)
-		}
-
-		termMatches := engine.findAllTermIndices(matchText, matchTerm)
+		termMatches := engine.findAllTermIndices(text, term)
 
 		if len(termMatches) > 0 {
 			matches = append(matches, termMatches...)
@@ -128,118 +231,69 @@ func (engine *Engine) containAny(terms []string, text string) [][2]int {
 	return matches
 }
 
-func (engine *Engine) containAllCheckOnly(terms []string, text string) bool {
-	matchText := text
-	if engine.Config.IgnoreCase {
-		matchText = strings.ToLower(text)
-	}
-
-	for _, term := range terms {
-		matchTerm := term
-		if engine.Config.IgnoreCase {
-			matchTerm = strings.ToLower(term)
-		}
-
-		start, _ := engine.findTermIndex(matchText, matchTerm, 0)
-		if start == -1 {
-			return false
-		}
-	}
-	return true
-}
-
-func (engine *Engine) containAllCheckOnlyBytes(list []string, text []byte) bool {
+func (engine *Engine) containAllCheckOnlyBytes(list []Term, text []byte) bool {
 	for _, term := range list {
-		if !bytes.Contains(text, []byte(term)) {
-			return false
+		if term.HasWildcard {
+			start, _ := engine.findWildcardInterval(text, term)
+			if start == -1 {
+				return false
+			}
+		} else {
+			if !bytes.Contains(text, term.Bytes) {
+				return false
+			}
 		}
 	}
 	return true
 }
 
-func (engine *Engine) containAll(terms []string, text string) [][2]int {
-	matchText := text
-	if engine.Config.IgnoreCase {
-		matchText = strings.ToLower(text)
-	}
-
+func (engine *Engine) containAll(terms []Term, text string) [][2]int {
 	var matches [][2]int
 
 	for _, term := range terms {
-		matchTerm := term
-		if engine.Config.IgnoreCase {
-			matchTerm = strings.ToLower(term)
-		}
-
-		termMatches := engine.findAllTermIndices(matchText, matchTerm)
+		termMatches := engine.findAllTermIndices(text, term)
 
 		if len(termMatches) == 0 {
 			return nil
 		}
-
 		matches = append(matches, termMatches...)
 	}
-
 	return matches
 }
 
-func (engine *Engine) containOrderedCheckOnly(terms []string, text string) bool {
-	matchText := text
-	if engine.Config.IgnoreCase {
-		matchText = strings.ToLower(text)
-	}
-
-	currentPos := 0
-	for _, term := range terms {
-		matchTerm := term
-		if engine.Config.IgnoreCase {
-			matchTerm = strings.ToLower(term)
-		}
-
-		_, end := engine.findTermIndex(matchText, matchTerm, currentPos)
-		if end == -1 {
-			return false
-		}
-		currentPos = end
-	}
-	return true
-}
-
-func (engine *Engine) containOrderedCheckOnlyBytes(list []string, text []byte) bool {
+func (engine *Engine) containOrderedCheckOnlyBytes(list []Term, text []byte) bool {
 	currentIdx := 0
 	for _, term := range list {
-		idx := bytes.Index(text[currentIdx:], []byte(term))
-		if idx == -1 {
-			return false
+		searchArea := text[currentIdx:]
+
+		if term.HasWildcard {
+			start, end := engine.findWildcardInterval(searchArea, term)
+			if start == -1 {
+				return false
+			}
+			currentIdx += end
+		} else {
+			idx := bytes.Index(searchArea, term.Bytes)
+			if idx == -1 {
+				return false
+			}
+			currentIdx += idx + len(term.Bytes)
 		}
-		currentIdx += idx + len(term)
 	}
 	return true
 }
 
-func (engine *Engine) containOrdered(terms []string, text string) [][2]int {
-	matchText := text
-	if engine.Config.IgnoreCase {
-		matchText = strings.ToLower(text)
-	}
-
+func (engine *Engine) containOrdered(terms []Term, text string) [][2]int {
 	var matches [][2]int
 	currentPos := 0
 
 	for _, term := range terms {
-		matchTerm := term
-		if engine.Config.IgnoreCase {
-			matchTerm = strings.ToLower(term)
-		}
-
-		start, end := engine.findTermIndex(matchText, matchTerm, currentPos)
+		start, end := engine.findTermIndex(text, term, currentPos)
 
 		if start == -1 {
 			return nil
 		}
-
 		matches = append(matches, [2]int{start, end})
-
 		currentPos = end
 	}
 
@@ -247,28 +301,31 @@ func (engine *Engine) containOrdered(terms []string, text string) [][2]int {
 }
 
 func (engine *Engine) CheckOnlyBytes(text []byte) bool {
+	var textToCheck []byte
 	if engine.Config.IgnoreCase {
-		text = bytes.ToLower(text)
+		textToCheck = bytes.ToLower(text)
+	} else {
+		textToCheck = text
 	}
 
-	if engine.containAnyCheckOnlyBytes(engine.searchTerm.blackList, text) != -1 {
+	if engine.containAnyCheckOnlyBytes(engine.searchTerm.blackList, textToCheck) != -1 {
 		return false
 	}
 
 	if len(engine.searchTerm.orderedList) > 0 {
-		if !engine.containOrderedCheckOnlyBytes(engine.searchTerm.orderedList, text) {
+		if !engine.containOrderedCheckOnlyBytes(engine.searchTerm.orderedList, textToCheck) {
 			return false
 		}
 	}
 
 	if len(engine.searchTerm.whiteList) > 0 {
-		if !engine.containAllCheckOnlyBytes(engine.searchTerm.whiteList, text) {
+		if !engine.containAllCheckOnlyBytes(engine.searchTerm.whiteList, textToCheck) {
 			return false
 		}
 	}
 
 	if len(engine.searchTerm.greyList) > 0 {
-		if engine.containAnyCheckOnlyBytes(engine.searchTerm.greyList, text) == -1 {
+		if engine.containAnyCheckOnlyBytes(engine.searchTerm.greyList, textToCheck) == -1 {
 			return false
 		}
 	}
@@ -277,26 +334,6 @@ func (engine *Engine) CheckOnlyBytes(text []byte) bool {
 }
 
 func (engine *Engine) Search(text string) [][2]int {
-	if engine.containAnyCheckOnly(engine.searchTerm.blackList, text) != -1 {
-		return nil
-	}
-
-	if engine.Config.NoColor {
-		if len(engine.searchTerm.orderedList) > 0 {
-			if !engine.containOrderedCheckOnly(engine.searchTerm.orderedList, text) {
-				return nil
-			}
-		}
-
-		if len(engine.searchTerm.whiteList) > 0 {
-			if !engine.containAllCheckOnly(engine.searchTerm.whiteList, text) {
-				return nil
-			}
-		}
-
-		return [][2]int{}
-	}
-
 	var allMatches [][2]int
 
 	if len(engine.searchTerm.orderedList) > 0 {

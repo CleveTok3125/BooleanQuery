@@ -18,6 +18,7 @@ Viewing lines before (`-B`), after (`-A`), or surrounding (`-C`) the match.
 * **Smart Highlighting**:
 Automatically colors matched terms for better readability.
 * **Customizable separator character**
+* **Wildcard support**: Basic wildcard support: `*` and `?`
 
 ## Installation
 
@@ -80,6 +81,18 @@ for strings containing special characters:
     such as `*` matches `*` in wildcard,
     the escape sequence must be used.
 
+* Problem with `\`:
+  * Due to multiple layers of shell parsing,\
+  `\` is interpreted as an escape sequence and is escaped before reaching the query.
+  * There is a workaround for this problem,\
+  you can use multiple `\` or `'` (single quotes).
+  * For example, you can find the string `\query` by passing in `"\\\query"` or `"'\query'"`\
+  (two double quotes surrounding a single quote).
+
+* In wildcard mode, `*` and `?` are occupied and implicitly understood as query syntax:
+  * To find `*` and `?` literally, use the escape character `@`.
+  * *Why use `@` instead of `\`?* Due to the issue mentioned above.
+
 * Only the first character of a query group is checked to see
 if it's a valid query prefix.
   * You can search for strings containing a character matching the query prefix
@@ -106,4 +119,4 @@ Automatically detect and skip binary files to prevent terminal corruption.
 * [x] ~~Add (`--count-files`) flag to print only matched files.~~\
     Same results can be achieved by using `--files-with-matches` and `wc -l`.
 * [x] Add column indices for matches.
-* [ ] Wildcard support
+* [x] Wildcard support

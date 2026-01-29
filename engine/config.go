@@ -17,11 +17,14 @@ const (
 type Config struct {
 	BufferSize    int // bytes
 	BufferMaxSize int // bytes
-	CharSep       string
-	IgnoreCase    bool
-	ExactWord     bool
-	NoColor       bool
-	AllowBinary   bool
+
+	CharSep    string
+	IgnoreCase bool
+	ExactWord  bool
+	Wildcard   bool
+
+	NoColor     bool
+	AllowBinary bool
 }
 
 func CombineFlags(flags ...IntFlag) IntFlag {

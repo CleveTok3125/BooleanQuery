@@ -2,17 +2,96 @@
 package engine
 
 import (
+	"bytes"
 	"strings"
 
 	"mvdan.cc/sh/v3/shell"
 )
 
+const (
+	SafeEscapeChar = '@'
+	WildcardZero   = 0 // Use byte 0 as a replacement character for the wildcard `?`
+)
+
+type Term struct {
+	Bytes       []byte
+	Segments    [][]byte
+	HasWildcard bool
+}
+
 type searchTerm struct {
 	splited     []string
-	whiteList   []string // AND (+)
-	blackList   []string // NOT (-)
-	greyList    []string // OR (~)
-	orderedList []string // ORDERED (^)
+	whiteList   []Term // AND (+)
+	blackList   []Term // NOT (-)
+	greyList    []Term // OR (~)
+	orderedList []Term // ORDERED (^)
+}
+
+func parseWildcard(text string) ([][]byte, bool) {
+	var segments [][]byte
+	var currentSegment bytes.Buffer
+	hasWildcard := false
+
+	n := len(text)
+	for i := 0; i < n; i++ {
+		char := text[i]
+
+		if char == SafeEscapeChar {
+			if i+1 < n {
+				nextChar := text[i+1]
+
+				if nextChar == '*' || nextChar == '?' || nextChar == SafeEscapeChar {
+					currentSegment.WriteByte(nextChar)
+					i++
+					continue
+				}
+			}
+
+			currentSegment.WriteByte(char)
+			continue
+		}
+
+		if char == '*' {
+			hasWildcard = true
+
+			segments = append(segments, append([]byte(nil), currentSegment.Bytes()...))
+			currentSegment.Reset()
+			continue
+		}
+
+		if char == '?' {
+			hasWildcard = true
+			currentSegment.WriteByte(WildcardZero)
+			continue
+		}
+
+		currentSegment.WriteByte(char)
+	}
+
+	segments = append(segments, append([]byte(nil), currentSegment.Bytes()...))
+
+	return segments, hasWildcard
+}
+
+func createTerm(text string, wildcardMode bool) Term {
+	if !wildcardMode {
+		return Term{Bytes: []byte(text)}
+	}
+
+	segments, hasWildcard := parseWildcard(text)
+
+	t := Term{
+		Segments:    segments,
+		HasWildcard: hasWildcard,
+	}
+
+	if !hasWildcard && len(segments) > 0 {
+		t.Bytes = segments[0]
+	} else {
+		t.Bytes = []byte(text)
+	}
+
+	return t
 }
 
 func (engine *Engine) SetSearchTerm(searchTerm string) error {
@@ -26,19 +105,19 @@ func (engine *Engine) SetSearchTerm(searchTerm string) error {
 }
 
 func (engine *Engine) Classify() {
-	lists := map[string]*[]string{
+	lists := map[string]*[]Term{
 		"+": &engine.searchTerm.whiteList,
 		"-": &engine.searchTerm.blackList,
 		"~": &engine.searchTerm.greyList,
 		"^": &engine.searchTerm.orderedList,
 	}
 
-	for _, term := range engine.searchTerm.splited {
-		if term == "" {
+	for _, termStr := range engine.searchTerm.splited {
+		if termStr == "" {
 			continue
 		}
 
-		runes := []rune(term)
+		runes := []rune(termStr)
 		firstChar := string(runes[0])
 		rest := string(runes[1:])
 
@@ -46,16 +125,18 @@ func (engine *Engine) Classify() {
 			rest = strings.ToLower(rest)
 		}
 
+		var t Term
 		if list, ok := lists[firstChar]; ok {
-			*list = append(*list, rest)
+			t = createTerm(rest, engine.Config.Wildcard)
+			*list = append(*list, t)
 		} else {
-			termToAdd := term
+			termToAdd := termStr
 			if engine.Config.IgnoreCase {
-				termToAdd = strings.ToLower(term)
+				termToAdd = strings.ToLower(termStr)
 			}
-			engine.searchTerm.whiteList = append(engine.searchTerm.whiteList, termToAdd)
+			t = createTerm(termToAdd, engine.Config.Wildcard)
+			engine.searchTerm.whiteList = append(engine.searchTerm.whiteList, t)
 		}
-
 	}
 }
 
