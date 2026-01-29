@@ -82,12 +82,12 @@ for strings containing special characters:
     the escape sequence must be used.
 
 * Problem with `\`:
-  * Due to multiple layers of shell parsing,\
+  * Due to multiple layers of shell parsing,
   `\` is interpreted as an escape sequence and is escaped before reaching the query.
-  * There is a workaround for this problem,\
+  * There is a workaround for this problem,
   you can use multiple `\` or `'` (single quotes).
-  * For example, you can find the string `\query` by passing in `"\\\query"` or `"'\query'"`\
-  (two double quotes surrounding a single quote).
+  * For example, you can find the string `\query` by passing in `"\\\query"` or `"'\query'"`
+  (double quotes surrounding single quotes).
 
 * In wildcard mode, `*` and `?` are occupied and implicitly understood as query syntax:
   * To find `*` and `?` literally, use the escape character `@`.
