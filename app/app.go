@@ -6,12 +6,74 @@ import (
 	"io"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"runtime"
 	"sync"
 	"syscall"
 
 	"BooleanQuery/engine"
 )
+
+func collectFiles(root string, followSymlinks bool, expanded *[]string, visited map[string]bool, noWarn bool) {
+	var walk func(string)
+	walk = func(currentPath string) {
+		info, err := os.Lstat(currentPath)
+		if err != nil {
+			if !noWarn {
+				fmt.Fprintf(os.Stderr, "Error accessing %s: %v\n", currentPath, err)
+			}
+			return
+		}
+
+		targetInfo := info
+
+		if info.Mode()&os.ModeSymlink != 0 {
+			if !followSymlinks {
+				return
+			}
+
+			resolvedPath, err := filepath.EvalSymlinks(currentPath)
+			if err != nil {
+				if !noWarn {
+					fmt.Fprintf(os.Stderr, "Error resolving symlink %s: %v\n", currentPath, err)
+				}
+				return
+			}
+			resolvedInfo, err := os.Stat(resolvedPath)
+			if err != nil {
+				return
+			}
+			targetInfo = resolvedInfo
+
+			absPath, _ := filepath.Abs(resolvedPath)
+			if visited[absPath] {
+				if !noWarn {
+					fmt.Fprintf(os.Stderr, "bq: warning: recursive symlink loop detected at %s\n", currentPath)
+				}
+				return
+			}
+			visited[absPath] = true
+		}
+
+		if targetInfo.IsDir() {
+			entries, err := os.ReadDir(currentPath)
+			if err != nil {
+				if !noWarn {
+					fmt.Fprintf(os.Stderr, "Error reading directory %s: %v\n", currentPath, err)
+				}
+				return
+			}
+			for _, entry := range entries {
+				walk(filepath.Join(currentPath, entry.Name()))
+			}
+		} else {
+			if targetInfo.Mode().IsRegular() {
+				*expanded = append(*expanded, currentPath)
+			}
+		}
+	}
+	walk(root)
+}
 
 func Run(e *engine.Engine) bool {
 	watchTerminalSize()
@@ -31,6 +93,52 @@ func Run(e *engine.Engine) bool {
 		tempFilesLock.Unlock()
 		os.Exit(1)
 	}()
+
+	isRecursive := cli.Recursive || cli.DereferenceRecursive
+	if isRecursive {
+		cli.ShowFilePrefix = true
+	}
+
+	if len(cli.Files) == 0 {
+		if isRecursive {
+			cli.Files = []string{"."}
+		} else {
+			stdoutWriter := bufio.NewWriter(os.Stdout)
+			defer stdoutWriter.Flush()
+			return processInput(stdoutWriter, e, os.Stdin, "")
+		}
+	}
+
+	var expandedFiles []string
+	visitedSymlinks := make(map[string]bool)
+
+	for _, path := range cli.Files {
+		info, err := os.Stat(path)
+		if err != nil {
+			if !cli.NoWarn {
+				fmt.Fprintf(os.Stderr, "Error accessing %s: %v\n", path, err)
+			}
+			continue
+		}
+
+		if info.IsDir() {
+			if isRecursive {
+				collectFiles(path, cli.DereferenceRecursive, &expandedFiles, visitedSymlinks, cli.NoWarn)
+			} else {
+				if !cli.NoWarn {
+					fmt.Fprintf(os.Stderr, "bq: %s: Is a directory\n", path)
+				}
+			}
+		} else {
+			expandedFiles = append(expandedFiles, path)
+		}
+	}
+
+	cli.Files = expandedFiles
+
+	if len(cli.Files) == 0 {
+		return false
+	}
 
 	stdoutWriter := bufio.NewWriter(os.Stdout)
 	defer stdoutWriter.Flush()

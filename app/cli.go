@@ -10,10 +10,12 @@ var cli struct {
 	Query string   `arg:"" help:"Search query string."`
 	Files []string `arg:"" optional:"" type:"path" help:"File paths to search. Reads from stdin if empty."`
 
-	CharSep    string `short:"c" help:"Separator for splitting lines." default:"\n"`
-	IgnoreCase bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
-	ExactWord  bool   `short:"w" help:"Match exact words only." default:"false"`
-	Wildcard   bool   `short:"W" help:"Enable wildcard matching." default:"false"`
+	CharSep              string `short:"c" help:"Separator for splitting lines." default:"\n"`
+	IgnoreCase           bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
+	ExactWord            bool   `short:"w" help:"Match exact words only." default:"false"`
+	Wildcard             bool   `short:"W" help:"Enable wildcard matching." default:"false"`
+	Recursive            bool   `short:"r" help:"Read all files under each directory recursively." default:"false"`
+	DereferenceRecursive bool   `short:"R" help:"Similar to --recursive but follow all symbolic links." default:"false"`
 
 	NoColor          bool `help:"Disable colored output." default:"false"`
 	NoIndex          bool `help:"Disable index numbers in output." default:"false"`
