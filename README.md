@@ -152,36 +152,36 @@ in the temporary directory.
 
 ## Performance
 
-Benchmarked at commit `9baa90c` on 2026-06-13.
+Benchmarked at commit `b5ac4ac` on 2026-06-13.
 Hardware: AMD Ryzen 5 7535HS, Linux amd64, Go 1.25.4.
 
 ### Unit Benchmarks (single-line matching)
 
 | Benchmark | Time/op | Bytes/op | Allocs/op |
 |---|---|---|---|
-| CheckOnlyBytes | 41.2 ns | 0 | 0 |
-| CheckOnlyBytes (ExactWord) | 24.1 ns | 0 | 0 |
-| Search | 95.8 ns | 112 | 1 |
-| Search (Multiple Terms) | 97.8 ns | 112 | 1 |
-| HighlightTo (color) | 73.1 ns | 48 | 1 |
-| HighlightTo (no-color) | 6.52 ns | 0 | 0 |
-| findTermIndex | 27.3 ns | 0 | 0 |
+| CheckOnlyBytes | 47.7 ns | 0 | 0 |
+| CheckOnlyBytes (ExactWord) | 29.6 ns | 0 | 0 |
+| Search | 107 ns | 112 | 1 |
+| Search (Multiple Terms) | 104 ns | 112 | 1 |
+| HighlightTo (color) | 73.0 ns | 48 | 1 |
+| HighlightTo (no-color) | 6.54 ns | 0 | 0 |
+| findTermIndex | 27.5 ns | 0 | 0 |
 | findTermIndex (wildcard) | 44.0 ns | 0 | 0 |
-| ParseWildcard | 1.04 µs | 1,224 | 31 |
+| ParseWildcard | 1.02 µs | 1,224 | 31 |
 
 ### Stream Processing (in-memory)
 
 | Benchmark | Lines×Size | Time/op | Bytes/op | Allocs/op |
 |---|---|---|---|---|
-| ProcessStream | 100 × 50 B | 2.14 µs | 4,256 | 3 |
-| ProcessStream | 1000 × 500 B | 32.5 µs | 4,256 | 3 |
-| ProcessStream | WORDS mode | 50.3 µs | 4,256 | 3 |
+| ProcessStream | 100 × 50 B | 3.58 µs | 4,256 | 3 |
+| ProcessStream | 1000 × 500 B | 207 µs | 4,256 | 3 |
+| ProcessStream | WORDS mode | 51.8 µs | 4,256 | 3 |
 
 ### Query Classification
 
 | Benchmark | Time/op | Bytes/op | Allocs/op |
 |---|---|---|---|
-| Classify (3 queries) | 683 µs | 25,000 | 171 |
+| Classify (3 queries) | 5.06 µs | 4,672 | 84 |
 
 ### File Benchmarks (1 GB, 12 million lines)
 
@@ -194,10 +194,10 @@ go test -bench=BenchmarkFile -benchmem ./src/engine/
 
 | Benchmark | Time/op | Throughput | Bytes/op | Allocs/op |
 |---|---|---|---|---|
-| FileSearch | 801 ms | ~1.25 GB/s | 1.16 GB | 12 M |
-| FileSearch (ExactWord) | 789 ms | ~1.27 GB/s | 1.16 GB | 12 M |
-| FileStreamProcess | 696 ms | ~1.44 GB/s | 66 KB | 8 |
-| FileStreamProcess (Wildcard) | 931 ms | ~1.07 GB/s | 66 KB | 8 |
+| FileSearch | 840 ms | ~1.28 GB/s | 1.17 GB | 12 M |
+| FileSearch (ExactWord) | 931 ms | ~1.15 GB/s | 1.17 GB | 12 M |
+| FileStreamProcess | 1.20 s | ~0.90 GB/s | 66 KB | 8 |
+| FileStreamProcess (Wildcard) | 1.46 s | ~0.73 GB/s | 66 KB | 8 |
 
 > **Note:** File benchmarks allocate 12 M allocations because every line is converted to `string` for the `Split` call. For zero-alloc line-wise matching, use `ProcessStream` directly instead of pre-loading the entire file.
 
