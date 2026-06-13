@@ -1,0 +1,10 @@
+hello world
+this is a test
+error: something went wrong
+error: timeout occurred
+critical: system failure
+just a normal line
+database connection error
+everything is fine
+warning: low memory
+fatal: kernel panic
