@@ -340,11 +340,38 @@ func TestClassify_WildcardMode(t *testing.T) {
 	}
 }
 
-func TestSetSearchTerm_Error(t *testing.T) {
+func TestSetSearchTerm_NoErrorForUnclosedQuote(t *testing.T) {
 	e := New()
 	err := e.SetSearchTerm("error 'unclosed")
-	if err == nil {
-		t.Error("expected error for unclosed quote, got nil")
+	if err != nil {
+		t.Fatalf("SetSearchTerm returned error: %v", err)
+	}
+
+	e.Classify()
+	if len(e.GetSearchTerm().whiteList) != 2 {
+		t.Fatalf("expected 2 whitelist terms (error, 'unclosed), got %d", len(e.GetSearchTerm().whiteList))
+	}
+	if string(e.GetSearchTerm().whiteList[0].Bytes) != "error" {
+		t.Errorf("first term = %q, want %q", string(e.GetSearchTerm().whiteList[0].Bytes), "error")
+	}
+	if string(e.GetSearchTerm().whiteList[1].Bytes) != "'unclosed" {
+		t.Errorf("second term = %q, want %q", string(e.GetSearchTerm().whiteList[1].Bytes), "'unclosed")
+	}
+}
+
+func TestSetSearchTerm_LiteralQuote(t *testing.T) {
+	e := New()
+	err := e.SetSearchTerm("'")
+	if err != nil {
+		t.Fatalf("SetSearchTerm returned error: %v", err)
+	}
+
+	e.Classify()
+	if len(e.GetSearchTerm().whiteList) != 1 {
+		t.Fatalf("expected 1 term, got %d", len(e.GetSearchTerm().whiteList))
+	}
+	if string(e.GetSearchTerm().whiteList[0].Bytes) != "'" {
+		t.Errorf("first term = %q, want %q", string(e.GetSearchTerm().whiteList[0].Bytes), "'")
 	}
 }
 

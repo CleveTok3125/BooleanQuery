@@ -55,7 +55,7 @@ func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag) func(
 		for scanner.Scan() {
 			part := scanner.Bytes()
 
-			if bytes.IndexByte(part, 0) != -1 {
+			if isBinaryContent(part) {
 				if engine.Config.AllowBinary {
 					continue
 				} else {
@@ -102,4 +102,16 @@ func (engine *Engine) ProcessStream(input io.Reader, combinedFlag IntFlag) func(
 		}
 		return nil
 	}
+}
+
+func isBinaryContent(data []byte) bool {
+	for _, b := range data {
+		if b == 0 {
+			return true
+		}
+		if b < 32 && b != 9 && b != 10 && b != 13 {
+			return true
+		}
+	}
+	return false
 }

@@ -3,9 +3,8 @@ package engine
 
 import (
 	"bytes"
+	"errors"
 	"strings"
-
-	"mvdan.cc/sh/v3/shell"
 )
 
 const (
@@ -94,8 +93,76 @@ func createTerm(text string, wildcardMode bool) Term {
 	return t
 }
 
+func splitWords(input string) ([]string, error) {
+	var words []string
+	var buf bytes.Buffer
+	i, n := 0, len(input)
+
+	for i < n {
+		switch ch := input[i]; {
+		case ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r':
+			if buf.Len() > 0 {
+				words = append(words, buf.String())
+				buf.Reset()
+			}
+			i++
+		case ch == '\'':
+			if strings.IndexByte(input[i+1:], '\'') == -1 {
+				buf.WriteByte(ch)
+				i++
+				break
+			}
+			i++
+			for i < n {
+				if input[i] == '\'' {
+					break
+				}
+				if input[i] == '\\' && i+1 < n && (input[i+1] == '\'' || input[i+1] == '\\') {
+					i++
+				}
+				buf.WriteByte(input[i])
+				i++
+			}
+			if i >= n {
+				return nil, errors.New("unclosed single quote")
+			}
+			i++ // skip closing '
+		case ch == '"':
+			if strings.IndexByte(input[i+1:], '"') == -1 {
+				buf.WriteByte(ch)
+				i++
+				break
+			}
+			i++
+			for i < n {
+				if input[i] == '"' {
+					break
+				}
+				if input[i] == '\\' && i+1 < n && (input[i+1] == '"' || input[i+1] == '\\') {
+					i++
+				}
+				buf.WriteByte(input[i])
+				i++
+			}
+			if i >= n {
+				return nil, errors.New("unclosed double quote")
+			}
+			i++ // skip closing "
+		default:
+			buf.WriteByte(ch)
+			i++
+		}
+	}
+
+	if buf.Len() > 0 {
+		words = append(words, buf.String())
+	}
+
+	return words, nil
+}
+
 func (engine *Engine) SetSearchTerm(searchTerm string) error {
-	words, err := shell.Fields(searchTerm, nil)
+	words, err := splitWords(searchTerm)
 	if err != nil {
 		return err
 	}
