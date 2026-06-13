@@ -1,5 +1,9 @@
 # BooleanQuery
 
+[![CI](https://github.com/CleveTok3125/BooleanQuery/actions/workflows/ci.yml/badge.svg)](https://github.com/CleveTok3125/BooleanQuery/actions/workflows/ci.yml)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/CleveTok3125/BooleanQuery)
+
 **BooleanQuery** is a high-performance,
 concurrent CLI text search tool written in Go.
 It allows searching using complex boolean logic (AND, OR, NOT, ORDERED AND)
