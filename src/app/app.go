@@ -14,14 +14,12 @@ import (
 	"BooleanQuery/src/engine"
 )
 
-func collectFiles(root string, followSymlinks bool, expanded *[]string, visited map[string]bool, noWarn bool) {
+func collectFiles(root string, followSymlinks bool, expanded *[]string, visited map[string]bool) {
 	var walk func(string)
 	walk = func(currentPath string) {
 		info, err := os.Lstat(currentPath)
 		if err != nil {
-			if !noWarn {
-				fmt.Fprintf(os.Stderr, "Error accessing %s: %v\n", currentPath, err)
-			}
+			fmt.Fprintf(os.Stderr, "Error accessing %s: %v\n", currentPath, err)
 			return
 		}
 
@@ -34,9 +32,7 @@ func collectFiles(root string, followSymlinks bool, expanded *[]string, visited 
 
 			resolvedPath, err := filepath.EvalSymlinks(currentPath)
 			if err != nil {
-				if !noWarn {
-					fmt.Fprintf(os.Stderr, "Error resolving symlink %s: %v\n", currentPath, err)
-				}
+				fmt.Fprintf(os.Stderr, "Error resolving symlink %s: %v\n", currentPath, err)
 				return
 			}
 			resolvedInfo, err := os.Stat(resolvedPath)
@@ -47,9 +43,7 @@ func collectFiles(root string, followSymlinks bool, expanded *[]string, visited 
 
 			absPath, _ := filepath.Abs(resolvedPath)
 			if visited[absPath] {
-				if !noWarn {
-					fmt.Fprintf(os.Stderr, "bq: warning: recursive symlink loop detected at %s\n", currentPath)
-				}
+				fmt.Fprintf(os.Stderr, "bq: warning: recursive symlink loop detected at %s\n", currentPath)
 				return
 			}
 			visited[absPath] = true
@@ -58,9 +52,7 @@ func collectFiles(root string, followSymlinks bool, expanded *[]string, visited 
 		if targetInfo.IsDir() {
 			entries, err := os.ReadDir(currentPath)
 			if err != nil {
-				if !noWarn {
-					fmt.Fprintf(os.Stderr, "Error reading directory %s: %v\n", currentPath, err)
-				}
+				fmt.Fprintf(os.Stderr, "Error reading directory %s: %v\n", currentPath, err)
 				return
 			}
 			for _, entry := range entries {
@@ -115,19 +107,15 @@ func Run(e *engine.Engine) bool {
 	for _, path := range cli.Files {
 		info, err := os.Stat(path)
 		if err != nil {
-			if !cli.NoWarn {
-				fmt.Fprintf(os.Stderr, "Error accessing %s: %v\n", path, err)
-			}
+			fmt.Fprintf(os.Stderr, "Error accessing %s: %v\n", path, err)
 			continue
 		}
 
 		if info.IsDir() {
 			if isRecursive {
-				collectFiles(path, cli.DereferenceRecursive, &expandedFiles, visitedSymlinks, cli.NoWarn)
-			} else {
-				if !cli.NoWarn {
-					fmt.Fprintf(os.Stderr, "bq: %s: Is a directory\n", path)
-				}
+				collectFiles(path, cli.DereferenceRecursive, &expandedFiles, visitedSymlinks)
+			} else if isInfo("dir") {
+				fmt.Fprintf(os.Stderr, "bq: %s: Is a directory\n", path)
 			}
 		} else {
 			expandedFiles = append(expandedFiles, path)

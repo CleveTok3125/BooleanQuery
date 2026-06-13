@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"BooleanQuery/src/engine"
 
@@ -28,7 +30,7 @@ var cli struct {
 	ShowFilePrefix   bool   `short:"f" help:"Show file path in prefix." default:"false"`
 	FilesWithMatches bool   `short:"F" help:"Print only names of matched files."`
 	Count            bool   `short:"l" help:"Print a count of matched lines per file."`
-	NoWarn           bool   `help:"Suppress warning messages."`
+	Info             []string `short:"I" help:"Show info messages by category (comma-separated). Available: binary, buffer, dir, all."`
 
 	Stream bool `help:"Force sequential processing (single-threaded) and print immediately." default:"false"`
 
@@ -38,6 +40,27 @@ var cli struct {
 
 	AllowBinary bool `help:"Process binary files (skip binary lines instead of stopping)." default:"false"`
 	MaxBuffer   int  `help:"Max buffer size in KB (max line length)." default:"1024"`
+}
+
+var validInfoCategories = map[string]bool{
+	"binary": true,
+	"buffer": true,
+	"dir":    true,
+}
+
+func isInfo(category string) bool {
+	for _, item := range cli.Info {
+		for _, f := range strings.Split(item, ",") {
+			f = strings.TrimSpace(f)
+			if f == "all" {
+				return validInfoCategories[category]
+			}
+			if f == category {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func ParseCLI() {
@@ -52,6 +75,19 @@ func ParseCLI() {
 	if cli.Context > 0 {
 		cli.After = cli.Context
 		cli.Before = cli.Context
+	}
+
+	for _, item := range cli.Info {
+		for _, f := range strings.Split(item, ",") {
+			f = strings.TrimSpace(f)
+			if f == "all" {
+				continue
+			}
+			if !validInfoCategories[f] {
+				fmt.Fprintf(os.Stderr, "bq: invalid info category %q. Available: binary, buffer, dir, all\n", f)
+				os.Exit(2)
+			}
+		}
 	}
 }
 

@@ -173,7 +173,7 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 
 		return true
 	})
-	if err != nil && !cli.NoWarn {
+	if err != nil {
 		name := displayName
 		if name == "" {
 			name = "{stdin}"
@@ -181,9 +181,13 @@ func processInput(w io.Writer, e *engine.Engine, reader io.Reader, displayName s
 
 		switch err {
 		case engine.ErrBinaryFile:
-			fmt.Fprintf(os.Stderr, "Binary file detected: %s\n", name)
+			if isInfo("binary") {
+				fmt.Fprintf(os.Stderr, "Binary file detected: %s\n", name)
+			}
 		case bufio.ErrTooLong:
-			fmt.Fprintf(os.Stderr, "\nSkipped: The data is too long, exceeding the threshold of %d bytes (Binary file or stream is too large).\n", e.Config.BufferMaxSize)
+			if isInfo("buffer") {
+				fmt.Fprintf(os.Stderr, "\nSkipped: The data is too long, exceeding the threshold of %d bytes (Binary file or stream is too large).\n", e.Config.BufferMaxSize)
+			}
 		default:
 			fmt.Fprintf(os.Stderr, "Error reading %s: %v\n", name, err)
 		}

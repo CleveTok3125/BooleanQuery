@@ -24,7 +24,7 @@ func TestCollectFiles(t *testing.T) {
 
 	var files []string
 	visited := make(map[string]bool)
-	collectFiles(dir, false, &files, visited, true)
+	collectFiles(dir, false, &files, visited)
 
 	if len(files) != 3 {
 		t.Fatalf("expected 3 files (a.txt, other.txt, sub/b.txt), got %d: %v", len(files), files)
@@ -44,7 +44,7 @@ func TestCollectFiles_Recursive(t *testing.T) {
 
 	var files []string
 	visited := make(map[string]bool)
-	collectFiles(dir, false, &files, visited, true)
+	collectFiles(dir, false, &files, visited)
 
 	if len(files) != 2 {
 		t.Fatalf("expected 2 files (a.txt, b.txt), got %d: %v", len(files), files)
@@ -80,7 +80,7 @@ func TestCollectFiles_Symlink(t *testing.T) {
 	visited := make(map[string]bool)
 
 	// Without following symlinks, the symlink should be skipped
-	collectFiles(link, false, &files, visited, true)
+	collectFiles(link, false, &files, visited)
 	// collectFiles calls os.Lstat which will see a symlink dir,
 	// then since !followSymlinks, it will return (skip)
 	if len(files) != 0 {
@@ -90,7 +90,7 @@ func TestCollectFiles_Symlink(t *testing.T) {
 	// With following symlinks
 	files = nil
 	visited = make(map[string]bool)
-	collectFiles(link, true, &files, visited, true)
+	collectFiles(link, true, &files, visited)
 	if len(files) != 1 {
 		t.Errorf("expected 1 file when following symlinks, got %d: %v", len(files), files)
 	}
@@ -99,8 +99,8 @@ func TestCollectFiles_Symlink(t *testing.T) {
 func TestCollectFiles_NonExistent(t *testing.T) {
 	var files []string
 	visited := make(map[string]bool)
-	// Should not panic or error out (noWarn=true)
-	collectFiles("/nonexistent/path", false, &files, visited, true)
+	// Should not panic or error out
+	collectFiles("/nonexistent/path", false, &files, visited)
 	if len(files) != 0 {
 		t.Errorf("expected 0 files, got %d", len(files))
 	}
@@ -116,7 +116,7 @@ func TestCollectFiles_RegularFileOnly(t *testing.T) {
 
 	var files []string
 	visited := make(map[string]bool)
-	collectFiles(dir, false, &files, visited, true)
+	collectFiles(dir, false, &files, visited)
 
 	if len(files) != 1 {
 		t.Fatalf("expected 1 file, got %d: %v", len(files), files)

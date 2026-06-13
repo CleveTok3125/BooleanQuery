@@ -111,7 +111,6 @@ func TestProcessInput_Basic(t *testing.T) {
 
 	var buf bytes.Buffer
 	input := strings.NewReader("hello world\nerror occurred\nfine line\nerror again\n")
-	cli.NoWarn = true
 
 	found := processInput(&buf, e, input, "")
 	if !found {
@@ -145,7 +144,6 @@ func TestProcessInput_NoMatch(t *testing.T) {
 
 	var buf bytes.Buffer
 	input := strings.NewReader("hello world\nnothing here\n")
-	cli.NoWarn = true
 
 	found := processInput(&buf, e, input, "")
 	if found {
@@ -175,7 +173,6 @@ func TestProcessInput_CountMode(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("error one\ngood\nerror two\nok\nerror three\n")
 	cli.Count = true
-	cli.NoWarn = true
 
 	found := processInput(&buf, e, input, "")
 	if !found {
@@ -205,7 +202,6 @@ func TestProcessInput_FilesWithMatches(t *testing.T) {
 	var buf bytes.Buffer
 	input := strings.NewReader("error found\nok\n")
 	cli.FilesWithMatches = true
-	cli.NoWarn = true
 
 	found := processInput(&buf, e, input, "test.txt")
 	if !found {
@@ -231,7 +227,6 @@ func TestProcessInput_BinaryFile(t *testing.T) {
 	input := strings.NewReader("hello\x00world\n")
 
 	var buf bytes.Buffer
-	cli.NoWarn = false
 
 	found := processInput(&buf, e, input, "test.bin")
 	if found {
@@ -259,7 +254,6 @@ func TestProcessFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.Classify()
-	cli.NoWarn = true
 
 	var buf bytes.Buffer
 	found, err := processFile(&buf, e, path)
@@ -312,7 +306,6 @@ func TestProcessFileToTemp(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.Classify()
-	cli.NoWarn = true
 
 	tmpPath, hasContent, err := processFileToTemp(e, path)
 	if err != nil {
@@ -354,7 +347,6 @@ func TestProcessFileToTemp_NoMatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.Classify()
-	cli.NoWarn = true
 
 	tmpPath, hasContent, err := processFileToTemp(e, path)
 	if err != nil {
@@ -386,8 +378,6 @@ func TestProcessInput_NegateQuery(t *testing.T) {
 
 	var buf bytes.Buffer
 	input := strings.NewReader("error occurred\nerror with timeout\njust error\n")
-	cli.NoWarn = true
-
 	found := processInput(&buf, e, input, "")
 	if !found {
 		t.Error("expected found=true")
