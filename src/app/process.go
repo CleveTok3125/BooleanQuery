@@ -9,7 +9,7 @@ import (
 	"os"
 	"strconv"
 
-	"BooleanQuery/engine"
+	"BooleanQuery/src/engine"
 )
 
 type lineInfo struct {

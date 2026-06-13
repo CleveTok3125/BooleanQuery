@@ -30,7 +30,7 @@ git clone https://github.com/CleveTok3125/BooleanQuery.git
 cd BooleanQuery
 
 # Build the binary
-go build -o bq .
+go build -o bq ./src/
 ```
 
 ## Usage

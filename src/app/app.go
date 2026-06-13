@@ -11,7 +11,7 @@ import (
 	"sync"
 	"syscall"
 
-	"BooleanQuery/engine"
+	"BooleanQuery/src/engine"
 )
 
 func collectFiles(root string, followSymlinks bool, expanded *[]string, visited map[string]bool, noWarn bool) {

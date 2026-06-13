@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"BooleanQuery/engine"
+	"BooleanQuery/src/engine"
 )
 
 func setCLIDefaults() {

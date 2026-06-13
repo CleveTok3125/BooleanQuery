@@ -36,7 +36,7 @@ func main() {
 	seed := time.Now().UnixNano()
 	rng := rand.New(rand.NewSource(seed))
 
-	f, err := os.Create("testdata/bench.log")
+	f, err := os.Create("test/bench.log")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,5 +75,5 @@ func main() {
 		fmt.Fprintf(f, "%s [%s] [%s] %s\n", ts, level, comp, line)
 	}
 
-	log.Printf("Generated %d lines to testdata/bench.log", numLines)
+	log.Printf("Generated %d lines to test/bench.log", numLines)
 }

@@ -34,15 +34,15 @@ jobs:
             ${{ runner.os }}-go-${{ matrix.go }}-
 
       - name: Build
-        run: go build -o bq .
+        run: go build -o bq ./src/
 
       - name: Vet & format check
         run: |
-          go vet ./...
+          go vet ./src/...
           test -z "$(gofmt -l .)"
 
       - name: Test with race & coverage
-        run: go test -v -race -count=1 -coverprofile=coverage.out -covermode=atomic ./...
+        run: go test -v -race -count=1 -coverprofile=coverage.out -covermode=atomic ./src/...
         env:
           GOFLAGS: -count=1
 
@@ -52,7 +52,7 @@ jobs:
           git diff --exit-code go.mod go.sum
 
       - name: Benchmark (time + allocs)
-        run: go test -bench=. -benchtime=100ms -benchmem ./engine/
+        run: go test -bench=. -benchtime=100ms -benchmem ./src/engine/
 
   lint:
     runs-on: ubuntu-latest
@@ -74,7 +74,7 @@ jobs:
           key: ${{ runner.os }}-lint-go-${{ hashFiles('**/go.sum') }}
 
       - name: Build
-        run: go build -o /dev/null .
+        run: go build -o /dev/null ./src/
 
       - name: Staticcheck
-        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./...
+        run: go run honnef.co/go/tools/cmd/staticcheck@latest ./src/...

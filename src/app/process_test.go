@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"BooleanQuery/engine"
+	"BooleanQuery/src/engine"
 )
 
 func TestPrintLine(t *testing.T) {

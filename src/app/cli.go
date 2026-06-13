@@ -3,7 +3,7 @@ package app
 import (
 	"os"
 
-	"BooleanQuery/engine"
+	"BooleanQuery/src/engine"
 
 	"github.com/alecthomas/kong"
 	"golang.org/x/term"
