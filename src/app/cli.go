@@ -24,12 +24,12 @@ var cli struct {
 
 	Grep bool `short:"g" name:"grep-like" help:"Enable grep-compatible plain output (hides header, padding, index, etc)."`
 
-	Color            string `help:"When to use colors: auto, always, never." enum:"auto,always,never" default:"auto"`
-	NoIndex          bool   `help:"Disable index numbers in output." default:"false"`
-	NoFileHeader     bool   `help:"Disable file header." default:"false"`
-	ShowFilePrefix   bool   `short:"f" help:"Show file path in prefix." default:"false"`
-	FilesWithMatches bool   `short:"F" help:"Print only names of matched files."`
-	Count            bool   `short:"l" help:"Print a count of matched lines per file."`
+	Color            string   `help:"When to use colors: auto, always, never." enum:"auto,always,never" default:"auto"`
+	NoIndex          bool     `help:"Disable index numbers in output." default:"false"`
+	NoFileHeader     bool     `help:"Disable file header." default:"false"`
+	ShowFilePrefix   bool     `short:"f" help:"Show file path in prefix." default:"false"`
+	FilesWithMatches bool     `short:"F" help:"Print only names of matched files."`
+	Count            bool     `short:"l" help:"Print a count of matched lines per file."`
 	Info             []string `short:"I" help:"Show info messages by category (comma-separated). Available: binary, buffer, dir, all."`
 
 	Stream bool `help:"Force sequential processing (single-threaded) and print immediately." default:"false"`
