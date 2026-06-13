@@ -162,24 +162,36 @@ func splitWords(input string) ([]string, error) {
 }
 
 func (engine *Engine) SetSearchTerm(searchTerm string) error {
-	words, err := splitWords(searchTerm)
-	if err != nil {
-		return err
-	}
+	return engine.SetSearchTerms([]string{searchTerm})
+}
 
-	engine.searchTerm.splited = words
+func (engine *Engine) SetSearchTerms(terms []string) error {
+	engine.searchTerms = make([]searchTerm, len(terms))
+	for i, term := range terms {
+		words, err := splitWords(term)
+		if err != nil {
+			return err
+		}
+		engine.searchTerms[i] = searchTerm{splited: words}
+		engine.classifyQuery(&engine.searchTerms[i])
+	}
 	return nil
 }
 
-func (engine *Engine) Classify() {
+func (engine *Engine) classifyQuery(st *searchTerm) {
+	st.whiteList = nil
+	st.blackList = nil
+	st.greyList = nil
+	st.orderedList = nil
+
 	lists := map[string]*[]Term{
-		"+": &engine.searchTerm.whiteList,
-		"-": &engine.searchTerm.blackList,
-		"~": &engine.searchTerm.greyList,
-		"^": &engine.searchTerm.orderedList,
+		"+": &st.whiteList,
+		"-": &st.blackList,
+		"~": &st.greyList,
+		"^": &st.orderedList,
 	}
 
-	for _, termStr := range engine.searchTerm.splited {
+	for _, termStr := range st.splited {
 		if termStr == "" {
 			continue
 		}
@@ -202,11 +214,20 @@ func (engine *Engine) Classify() {
 				termToAdd = strings.ToLower(termStr)
 			}
 			t = createTerm(termToAdd, engine.Config.Wildcard)
-			engine.searchTerm.whiteList = append(engine.searchTerm.whiteList, t)
+			st.whiteList = append(st.whiteList, t)
 		}
 	}
 }
 
+func (engine *Engine) Classify() {
+	for i := range engine.searchTerms {
+		engine.classifyQuery(&engine.searchTerms[i])
+	}
+}
+
 func (engine *Engine) GetSearchTerm() searchTerm {
-	return engine.searchTerm
+	if len(engine.searchTerms) > 0 {
+		return engine.searchTerms[0]
+	}
+	return searchTerm{}
 }

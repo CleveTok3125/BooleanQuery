@@ -159,7 +159,7 @@ func BenchmarkClassify(b *testing.B) {
 func BenchmarkFindTermIndex(b *testing.B) {
 	b.ReportAllocs()
 	e := newTestEngine(Config{}, "connection")
-	term := e.searchTerm.whiteList[0]
+	term := e.searchTerms[0].whiteList[0]
 	for b.Loop() {
 		e.findTermIndex(benchText, term, 0)
 	}
@@ -168,7 +168,7 @@ func BenchmarkFindTermIndex(b *testing.B) {
 func BenchmarkFindTermIndex_Wildcard(b *testing.B) {
 	b.ReportAllocs()
 	e := newTestEngine(Config{Wildcard: true}, "*connect*timeout")
-	term := e.searchTerm.whiteList[0]
+	term := e.searchTerms[0].whiteList[0]
 	for b.Loop() {
 		e.findTermIndex(benchText, term, 0)
 	}

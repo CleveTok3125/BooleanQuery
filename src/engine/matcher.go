@@ -244,6 +244,32 @@ func (engine *Engine) containOrdered(terms []Term, text string) [][2]int {
 	return matches
 }
 
+func (engine *Engine) checkQueryBytes(textToCheck []byte, st *searchTerm) bool {
+	if engine.containAnyCheckOnlyBytes(st.blackList, textToCheck) != -1 {
+		return false
+	}
+
+	if len(st.orderedList) > 0 {
+		if !engine.containOrderedCheckOnlyBytes(st.orderedList, textToCheck) {
+			return false
+		}
+	}
+
+	if len(st.whiteList) > 0 {
+		if !engine.containAllCheckOnlyBytes(st.whiteList, textToCheck) {
+			return false
+		}
+	}
+
+	if len(st.greyList) > 0 {
+		if engine.containAnyCheckOnlyBytes(st.greyList, textToCheck) == -1 {
+			return false
+		}
+	}
+
+	return true
+}
+
 func (engine *Engine) CheckOnlyBytes(text []byte) bool {
 	var textToCheck []byte
 	if engine.Config.IgnoreCase {
@@ -252,63 +278,66 @@ func (engine *Engine) CheckOnlyBytes(text []byte) bool {
 		textToCheck = text
 	}
 
-	if engine.containAnyCheckOnlyBytes(engine.searchTerm.blackList, textToCheck) != -1 {
-		return false
-	}
-
-	if len(engine.searchTerm.orderedList) > 0 {
-		if !engine.containOrderedCheckOnlyBytes(engine.searchTerm.orderedList, textToCheck) {
-			return false
+	for _, st := range engine.searchTerms {
+		if engine.checkQueryBytes(textToCheck, &st) {
+			return true
 		}
 	}
-
-	if len(engine.searchTerm.whiteList) > 0 {
-		if !engine.containAllCheckOnlyBytes(engine.searchTerm.whiteList, textToCheck) {
-			return false
-		}
-	}
-
-	if len(engine.searchTerm.greyList) > 0 {
-		if engine.containAnyCheckOnlyBytes(engine.searchTerm.greyList, textToCheck) == -1 {
-			return false
-		}
-	}
-
-	return true
+	return false
 }
 
-func (engine *Engine) Search(text string) [][2]int {
+func (engine *Engine) searchSingle(text string, st *searchTerm) [][2]int {
 	var allMatches [][2]int
 
-	if len(engine.searchTerm.orderedList) > 0 {
-		orderedMatches := engine.containOrdered(engine.searchTerm.orderedList, text)
+	if len(st.orderedList) > 0 {
+		orderedMatches := engine.containOrdered(st.orderedList, text)
 		if orderedMatches == nil {
 			return nil
 		}
 		allMatches = append(allMatches, orderedMatches...)
 	}
 
-	if len(engine.searchTerm.whiteList) > 0 {
-		whiteMatches := engine.containAll(engine.searchTerm.whiteList, text)
+	if len(st.whiteList) > 0 {
+		whiteMatches := engine.containAll(st.whiteList, text)
 		if whiteMatches == nil {
 			return nil
 		}
 		allMatches = append(allMatches, whiteMatches...)
 	}
 
-	if len(engine.searchTerm.greyList) > 0 {
-		greyMatches := engine.containAny(engine.searchTerm.greyList, text)
+	if len(st.greyList) > 0 {
+		greyMatches := engine.containAny(st.greyList, text)
 		if greyMatches != nil {
 			allMatches = append(allMatches, greyMatches...)
 		}
 	}
 
 	if len(allMatches) == 0 {
-		if len(engine.searchTerm.orderedList) == 0 &&
-			len(engine.searchTerm.whiteList) == 0 &&
-			len(engine.searchTerm.greyList) == 0 {
+		if len(st.orderedList) == 0 &&
+			len(st.whiteList) == 0 &&
+			len(st.greyList) == 0 {
 			return [][2]int{}
 		}
+		return nil
+	}
+
+	return allMatches
+}
+
+func (engine *Engine) Search(text string) [][2]int {
+	var allMatches [][2]int
+
+	for _, st := range engine.searchTerms {
+		matches := engine.searchSingle(text, &st)
+		if matches != nil {
+			if len(matches) == 0 {
+				return [][2]int{}
+			}
+			allMatches = append(allMatches, matches...)
+		}
+	}
+
+	if len(allMatches) == 0 {
 		return nil
 	}
 

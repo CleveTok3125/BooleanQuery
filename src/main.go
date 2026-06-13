@@ -15,10 +15,9 @@ func main() {
 
 	app.ApplyConfigToEngine(e)
 
-	if err := e.SetSearchTerm(app.GetQuery()); err != nil {
+	if err := e.SetSearchTerms(app.GetQueries()); err != nil {
 		log.Fatal("Error splitting search term:", err)
 	}
-	e.Classify()
 
 	found := app.Run(e)
 

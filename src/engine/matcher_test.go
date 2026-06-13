@@ -8,7 +8,6 @@ func newTestEngine(cfg Config, query string) *Engine {
 	if err := e.SetSearchTerm(query); err != nil {
 		panic(err)
 	}
-	e.Classify()
 	return e
 }
 
@@ -109,7 +108,7 @@ func TestFindTermIndex(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{}, tt.query)
-			term := e.searchTerm.whiteList[0]
+			term := e.searchTerms[0].whiteList[0]
 			start, end := e.findTermIndex([]byte(tt.text), term, tt.offset)
 			if tt.wantNoMatch {
 				if start != -1 {
@@ -178,7 +177,7 @@ func TestFindTermIndex_ExactWord(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{ExactWord: true}, tt.query)
-			term := e.searchTerm.whiteList[0]
+			term := e.searchTerms[0].whiteList[0]
 			start, end := e.findTermIndex([]byte(tt.text), term, 0)
 			if tt.wantNoMatch {
 				if start != -1 {
@@ -255,7 +254,7 @@ func TestFindTermIndex_Wildcard(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{Wildcard: true}, tt.query)
-			st := e.searchTerm
+			st := e.searchTerms[0]
 			// The wildcard term could be in whiteList or greyList etc.
 			var term Term
 			if len(st.whiteList) > 0 {
@@ -316,7 +315,7 @@ func TestFindWildcardInterval(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{Wildcard: true}, tt.termStr)
-			term := e.searchTerm.whiteList[0]
+			term := e.searchTerms[0].whiteList[0]
 			start, end := e.findWildcardInterval([]byte(tt.text), term)
 			if tt.wantNoMatch {
 				if start != -1 || end != -1 {
@@ -361,7 +360,7 @@ func TestContainAnyCheckOnlyBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{}, tt.query)
-			got := e.containAnyCheckOnlyBytes(e.searchTerm.greyList, []byte(tt.text))
+			got := e.containAnyCheckOnlyBytes(e.searchTerms[0].greyList, []byte(tt.text))
 			if got != tt.want {
 				t.Errorf("containAnyCheckOnlyBytes = %d, want %d", got, tt.want)
 			}
@@ -411,7 +410,7 @@ func TestContainAllCheckOnlyBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{}, tt.query)
-			got := e.containAllCheckOnlyBytes(e.searchTerm.whiteList, []byte(tt.text))
+			got := e.containAllCheckOnlyBytes(e.searchTerms[0].whiteList, []byte(tt.text))
 			if got != tt.want {
 				t.Errorf("containAllCheckOnlyBytes = %v, want %v", got, tt.want)
 			}
@@ -461,7 +460,7 @@ func TestContainOrderedCheckOnlyBytes(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			e := newTestEngine(Config{}, tt.query)
-			got := e.containOrderedCheckOnlyBytes(e.searchTerm.orderedList, []byte(tt.text))
+			got := e.containOrderedCheckOnlyBytes(e.searchTerms[0].orderedList, []byte(tt.text))
 			if got != tt.want {
 				t.Errorf("containOrderedCheckOnlyBytes = %v, want %v", got, tt.want)
 			}
@@ -736,7 +735,7 @@ func TestSearch_SortedByPosition(t *testing.T) {
 
 func TestContainAny(t *testing.T) {
 	e := newTestEngine(Config{}, "~cat ~dog ~bird")
-	matches := e.containAny(e.searchTerm.greyList, "I have a cat and a dog")
+	matches := e.containAny(e.searchTerms[0].greyList, "I have a cat and a dog")
 	if matches == nil {
 		t.Fatal("expected matches")
 	}
@@ -748,7 +747,7 @@ func TestContainAny(t *testing.T) {
 
 func TestContainAll(t *testing.T) {
 	e := newTestEngine(Config{}, "cat dog")
-	matches := e.containAll(e.searchTerm.whiteList, "cat and dog")
+	matches := e.containAll(e.searchTerms[0].whiteList, "cat and dog")
 	if matches == nil {
 		t.Fatal("expected matches for containAll")
 	}
@@ -756,7 +755,7 @@ func TestContainAll(t *testing.T) {
 
 func TestContainOrdered(t *testing.T) {
 	e := newTestEngine(Config{}, "^start ^end")
-	matches := e.containOrdered(e.searchTerm.orderedList, "start middle end")
+	matches := e.containOrdered(e.searchTerms[0].orderedList, "start middle end")
 	if matches == nil {
 		t.Fatal("expected matches for containOrdered")
 	}
@@ -770,7 +769,7 @@ func TestContainOrdered(t *testing.T) {
 
 func TestContainAll_NoMatch(t *testing.T) {
 	e := newTestEngine(Config{}, "cat dog")
-	matches := e.containAll(e.searchTerm.whiteList, "cat only")
+	matches := e.containAll(e.searchTerms[0].whiteList, "cat only")
 	if matches != nil {
 		t.Errorf("expected nil, got %v", matches)
 	}
@@ -778,7 +777,7 @@ func TestContainAll_NoMatch(t *testing.T) {
 
 func TestContainOrdered_NoMatch(t *testing.T) {
 	e := newTestEngine(Config{}, "^start ^end")
-	matches := e.containOrdered(e.searchTerm.orderedList, "end then start")
+	matches := e.containOrdered(e.searchTerms[0].orderedList, "end then start")
 	if matches != nil {
 		t.Errorf("expected nil, got %v", matches)
 	}

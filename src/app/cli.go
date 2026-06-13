@@ -12,8 +12,9 @@ import (
 )
 
 var cli struct {
-	Query string   `arg:"" help:"Search query string."`
-	Files []string `arg:"" optional:"" help:"File paths to search. Reads from stdin if empty."`
+	Query    string   `arg:"" optional:"" help:"Search query string."`
+	Patterns []string `short:"e" name:"pattern" help:"Pattern (can be specified multiple times)."`
+	Files    []string `arg:"" optional:"" help:"File paths to search. Reads from stdin if empty."`
 
 	CharSep              string `short:"c" help:"Separator for splitting lines." default:"\n"`
 	IgnoreCase           bool   `short:"i" help:"Ignore case sensitivity." default:"false"`
@@ -77,6 +78,17 @@ func ParseCLI() {
 		cli.Before = cli.Context
 	}
 
+	if len(cli.Patterns) > 0 && cli.Query != "" {
+		cli.Files = append([]string{cli.Query}, cli.Files...)
+		cli.Query = ""
+	}
+
+	for i, p := range cli.Patterns {
+		if len(p) > 0 && p[0] == '=' {
+			cli.Patterns[i] = p[1:]
+		}
+	}
+
 	for _, item := range cli.Info {
 		for _, f := range strings.Split(item, ",") {
 			f = strings.TrimSpace(f)
@@ -91,8 +103,15 @@ func ParseCLI() {
 	}
 }
 
-func GetQuery() string {
-	return cli.Query
+func GetQueries() []string {
+	if len(cli.Patterns) > 0 {
+		return cli.Patterns
+	}
+	if cli.Query == "" {
+		fmt.Fprintf(os.Stderr, "bq: no search pattern specified\n")
+		os.Exit(2)
+	}
+	return []string{cli.Query}
 }
 
 func isOutputPiped() bool {

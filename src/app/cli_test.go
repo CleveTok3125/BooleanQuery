@@ -146,14 +146,26 @@ func TestParseCLI_Context(t *testing.T) {
 	}
 }
 
-func TestGetQuery(t *testing.T) {
+func TestGetQueries(t *testing.T) {
 	old := cli
 	defer func() { cli = old }()
 	setCLIDefaults()
 
 	cli.Query = "test query"
-	got := GetQuery()
-	if got != "test query" {
-		t.Errorf("GetQuery() = %q, want %q", got, "test query")
+	got := GetQueries()
+	if len(got) != 1 || got[0] != "test query" {
+		t.Errorf("GetQueries() = %v, want [test query]", got)
+	}
+}
+
+func TestGetQueries_Regexp(t *testing.T) {
+	old := cli
+	defer func() { cli = old }()
+	setCLIDefaults()
+
+	cli.Patterns = []string{"error", "warning"}
+	got := GetQueries()
+	if len(got) != 2 || got[0] != "error" || got[1] != "warning" {
+		t.Errorf("GetQueries() = %v, want [error warning]", got)
 	}
 }

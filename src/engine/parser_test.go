@@ -271,17 +271,17 @@ func TestClassify(t *testing.T) {
 			}
 			e.Classify()
 
-			if len(e.searchTerm.whiteList) != tt.wantAnd {
-				t.Errorf("whitelist len = %d, want %d", len(e.searchTerm.whiteList), tt.wantAnd)
+			if len(e.searchTerms[0].whiteList) != tt.wantAnd {
+				t.Errorf("whitelist len = %d, want %d", len(e.searchTerms[0].whiteList), tt.wantAnd)
 			}
-			if len(e.searchTerm.blackList) != tt.wantNot {
-				t.Errorf("blacklist len = %d, want %d", len(e.searchTerm.blackList), tt.wantNot)
+			if len(e.searchTerms[0].blackList) != tt.wantNot {
+				t.Errorf("blacklist len = %d, want %d", len(e.searchTerms[0].blackList), tt.wantNot)
 			}
-			if len(e.searchTerm.greyList) != tt.wantOr {
-				t.Errorf("greylist len = %d, want %d", len(e.searchTerm.greyList), tt.wantOr)
+			if len(e.searchTerms[0].greyList) != tt.wantOr {
+				t.Errorf("greylist len = %d, want %d", len(e.searchTerms[0].greyList), tt.wantOr)
 			}
-			if len(e.searchTerm.orderedList) != tt.wantOrd {
-				t.Errorf("orderedlist len = %d, want %d", len(e.searchTerm.orderedList), tt.wantOrd)
+			if len(e.searchTerms[0].orderedList) != tt.wantOrd {
+				t.Errorf("orderedlist len = %d, want %d", len(e.searchTerms[0].orderedList), tt.wantOrd)
 			}
 		})
 	}
@@ -295,25 +295,25 @@ func TestClassify_CaseInsensitive(t *testing.T) {
 	}
 	e.Classify()
 
-	if len(e.searchTerm.whiteList) != 1 {
-		t.Fatalf("expected 1 whitelist term, got %d", len(e.searchTerm.whiteList))
+	if len(e.searchTerms[0].whiteList) != 1 {
+		t.Fatalf("expected 1 whitelist term, got %d", len(e.searchTerms[0].whiteList))
 	}
-	if string(e.searchTerm.whiteList[0].Bytes) != "error" {
-		t.Errorf("whitelist term = %q, want %q", string(e.searchTerm.whiteList[0].Bytes), "error")
-	}
-
-	if len(e.searchTerm.blackList) != 1 {
-		t.Fatalf("expected 1 blacklist term, got %d", len(e.searchTerm.blackList))
-	}
-	if string(e.searchTerm.blackList[0].Bytes) != "timeout" {
-		t.Errorf("blacklist term = %q, want %q", string(e.searchTerm.blackList[0].Bytes), "timeout")
+	if string(e.searchTerms[0].whiteList[0].Bytes) != "error" {
+		t.Errorf("whitelist term = %q, want %q", string(e.searchTerms[0].whiteList[0].Bytes), "error")
 	}
 
-	if len(e.searchTerm.greyList) != 1 {
-		t.Fatalf("expected 1 greylist term, got %d", len(e.searchTerm.greyList))
+	if len(e.searchTerms[0].blackList) != 1 {
+		t.Fatalf("expected 1 blacklist term, got %d", len(e.searchTerms[0].blackList))
 	}
-	if string(e.searchTerm.greyList[0].Bytes) != "warning" {
-		t.Errorf("greylist term = %q, want %q", string(e.searchTerm.greyList[0].Bytes), "warning")
+	if string(e.searchTerms[0].blackList[0].Bytes) != "timeout" {
+		t.Errorf("blacklist term = %q, want %q", string(e.searchTerms[0].blackList[0].Bytes), "timeout")
+	}
+
+	if len(e.searchTerms[0].greyList) != 1 {
+		t.Fatalf("expected 1 greylist term, got %d", len(e.searchTerms[0].greyList))
+	}
+	if string(e.searchTerms[0].greyList[0].Bytes) != "warning" {
+		t.Errorf("greylist term = %q, want %q", string(e.searchTerms[0].greyList[0].Bytes), "warning")
 	}
 }
 
@@ -325,17 +325,17 @@ func TestClassify_WildcardMode(t *testing.T) {
 	}
 	e.Classify()
 
-	if len(e.searchTerm.whiteList) != 1 {
-		t.Fatalf("expected 1 whitelist term, got %d", len(e.searchTerm.whiteList))
+	if len(e.searchTerms[0].whiteList) != 1 {
+		t.Fatalf("expected 1 whitelist term, got %d", len(e.searchTerms[0].whiteList))
 	}
-	if !e.searchTerm.whiteList[0].HasWildcard {
+	if !e.searchTerms[0].whiteList[0].HasWildcard {
 		t.Error("expected whitelist term to have wildcard")
 	}
 
-	if len(e.searchTerm.blackList) != 1 {
-		t.Fatalf("expected 1 blacklist term, got %d", len(e.searchTerm.blackList))
+	if len(e.searchTerms[0].blackList) != 1 {
+		t.Fatalf("expected 1 blacklist term, got %d", len(e.searchTerms[0].blackList))
 	}
-	if !e.searchTerm.blackList[0].HasWildcard {
+	if !e.searchTerms[0].blackList[0].HasWildcard {
 		t.Error("expected blacklist term to have wildcard")
 	}
 }
