@@ -30,6 +30,30 @@ git clone https://github.com/CleveTok3125/BooleanQuery.git
 cd BooleanQuery
 
 # Build the binary
+make build
+```
+
+### Install to system
+
+```bash
+sudo make install          # → /usr/local/bin/bq
+```
+
+### Install to user-local
+
+```bash
+make install BINDIR=$HOME/.local/bin
+```
+
+### Uninstall
+
+```bash
+sudo make uninstall
+```
+
+### Build manually (without make)
+
+```fish
 go build -o bq ./src/
 ```
 
@@ -159,6 +183,31 @@ go test -bench=BenchmarkFile -benchmem ./src/engine/
 | FileStreamProcess (Wildcard) | 931 ms | ~1.07 GB/s | 66 KB | 8 |
 
 > **Note:** File benchmarks allocate 12 M allocations because every line is converted to `string` for the `Split` call. For zero-alloc line-wise matching, use `ProcessStream` directly instead of pre-loading the entire file.
+
+## Development
+
+### Prerequisites
+
+- Go 1.25.4 or higher
+- GNU Make
+
+### Commands
+
+```makefile
+make build     # Build the binary
+make test      # Run all tests
+make fmt       # Format source code
+make vet       # Static analysis
+make tidy      # Verify go.mod/go.sum are clean
+make check     # Run all checks: format, vet, build, tidy
+make clean     # Remove built binary
+```
+
+`make check` is the gate before CI — run it locally to ensure everything passes:
+
+```bash
+make check
+```
 
 ## ToDo
 

@@ -33,23 +33,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-${{ matrix.go }}-
 
-      - name: Build
-        run: go build -o bq ./src/
-
-      - name: Vet & format check
-        run: |
-          go vet ./src/...
-          test -z "$(gofmt -l .)"
+      - name: Check (fmt, vet, build, tidy)
+        run: make check
 
       - name: Test with race & coverage
         run: go test -v -race -count=1 -coverprofile=coverage.out -covermode=atomic ./src/...
-        env:
-          GOFLAGS: -count=1
-
-      - name: Verify tidy
-        run: |
-          go mod tidy
-          git diff --exit-code go.mod go.sum
 
       - name: Benchmark (time + allocs)
         run: go test -bench=. -benchtime=100ms -benchmem ./src/engine/
