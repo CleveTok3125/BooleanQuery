@@ -51,6 +51,9 @@ jobs:
           go mod tidy
           git diff --exit-code go.mod go.sum
 
+      - name: Benchmark (time + allocs)
+        run: go test -bench=. -benchtime=100ms -benchmem ./engine/
+
   lint:
     runs-on: ubuntu-latest
     steps:

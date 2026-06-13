@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"os"
 	"strings"
 	"testing"
 
@@ -10,23 +11,23 @@ import (
 
 func TestPrintLine(t *testing.T) {
 	tests := []struct {
-		name            string
-		setup           func()
-		text            string
-		matches         [][2]int
-		index           int
-		cachedPrefix    []byte
-		wantContain     string
-		wantNotContain  string
+		name           string
+		setup          func()
+		text           string
+		matches        [][2]int
+		index          int
+		cachedPrefix   []byte
+		wantContain    string
+		wantNotContain string
 	}{
 		{
 			name: "simple print with index",
 			setup: func() {
 				padLine, padCol = 4, 2
 			},
-			text:     "hello world",
-			matches:  [][2]int{{0, 5}},
-			index:    0,
+			text:        "hello world",
+			matches:     [][2]int{{0, 5}},
+			index:       0,
 			wantContain: "hello",
 		},
 		{
@@ -34,11 +35,11 @@ func TestPrintLine(t *testing.T) {
 			setup: func() {
 				padLine, padCol = 4, 2
 			},
-			text:     "test line",
-			matches:  nil,
-			index:    5,
+			text:         "test line",
+			matches:      nil,
+			index:        5,
 			cachedPrefix: []byte("file.txt:"),
-			wantContain: "file.txt:",
+			wantContain:  "file.txt:",
 		},
 		{
 			name: "no index mode",
@@ -46,9 +47,9 @@ func TestPrintLine(t *testing.T) {
 				padLine, padCol = 4, 2
 				cli.NoIndex = true
 			},
-			text:     "raw line",
-			matches:  nil,
-			index:    0,
+			text:           "raw line",
+			matches:        nil,
+			index:          0,
 			wantNotContain: "1",
 		},
 		{
@@ -56,9 +57,9 @@ func TestPrintLine(t *testing.T) {
 			setup: func() {
 				padLine, padCol = 4, 2
 			},
-			text:     "plain text",
-			matches:  nil,
-			index:    3,
+			text:        "plain text",
+			matches:     nil,
+			index:       3,
 			wantContain: "plain text",
 		},
 	}
@@ -235,6 +236,135 @@ func TestProcessInput_BinaryFile(t *testing.T) {
 	found := processInput(&buf, e, input, "test.bin")
 	if found {
 		t.Error("expected found=false for binary file")
+	}
+}
+
+func TestProcessFile(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/test.txt"
+	if err := os.WriteFile(path, []byte("hello world\nerror found\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldCli := cli
+	defer func() { cli = oldCli }()
+	setCLIDefaults()
+	padLine, padCol = 4, 2
+
+	e := engine.New()
+	e.Config.NoColor = true
+	e.Config.BufferSize = 4096
+	e.Config.BufferMaxSize = 64 * 1024
+	if err := e.SetSearchTerm("error"); err != nil {
+		t.Fatal(err)
+	}
+	e.Classify()
+	cli.NoWarn = true
+
+	var buf bytes.Buffer
+	found, err := processFile(&buf, e, path)
+	if err != nil {
+		t.Fatalf("processFile error: %v", err)
+	}
+	if !found {
+		t.Error("expected found=true")
+	}
+	if !strings.Contains(buf.String(), "error found") {
+		t.Errorf("output should contain match, got: %s", buf.String())
+	}
+}
+
+func TestProcessFile_NotFound(t *testing.T) {
+	oldCli := cli
+	defer func() { cli = oldCli }()
+	setCLIDefaults()
+	padLine, padCol = 4, 2
+
+	e := engine.New()
+	e.Config.NoColor = true
+	e.Config.BufferSize = 4096
+	e.Config.BufferMaxSize = 64 * 1024
+
+	var buf bytes.Buffer
+	_, err := processFile(&buf, e, "/nonexistent/file.txt")
+	if err == nil {
+		t.Error("expected error for nonexistent file")
+	}
+}
+
+func TestProcessFileToTemp(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/test.txt"
+	if err := os.WriteFile(path, []byte("hello world\nerror found\nerror again\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldCli := cli
+	defer func() { cli = oldCli }()
+	setCLIDefaults()
+	padLine, padCol = 4, 2
+
+	e := engine.New()
+	e.Config.NoColor = true
+	e.Config.BufferSize = 4096
+	e.Config.BufferMaxSize = 64 * 1024
+	if err := e.SetSearchTerm("error"); err != nil {
+		t.Fatal(err)
+	}
+	e.Classify()
+	cli.NoWarn = true
+
+	tmpPath, hasContent, err := processFileToTemp(e, path)
+	if err != nil {
+		t.Fatalf("processFileToTemp error: %v", err)
+	}
+	defer os.Remove(tmpPath)
+	if !hasContent {
+		t.Error("expected hasContent=true")
+	}
+	if tmpPath == "" {
+		t.Fatal("expected non-empty temp path")
+	}
+	data, err := os.ReadFile(tmpPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "error found") {
+		t.Errorf("temp file should contain match, got: %s", data)
+	}
+}
+
+func TestProcessFileToTemp_NoMatch(t *testing.T) {
+	dir := t.TempDir()
+	path := dir + "/test.txt"
+	if err := os.WriteFile(path, []byte("hello world\nall good\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	oldCli := cli
+	defer func() { cli = oldCli }()
+	setCLIDefaults()
+	padLine, padCol = 4, 2
+
+	e := engine.New()
+	e.Config.NoColor = true
+	e.Config.BufferSize = 4096
+	e.Config.BufferMaxSize = 64 * 1024
+	if err := e.SetSearchTerm("nonexistent"); err != nil {
+		t.Fatal(err)
+	}
+	e.Classify()
+	cli.NoWarn = true
+
+	tmpPath, hasContent, err := processFileToTemp(e, path)
+	if err != nil {
+		t.Fatalf("processFileToTemp error: %v", err)
+	}
+	if hasContent {
+		t.Error("expected hasContent=false for no matches")
+	}
+	if tmpPath != "" {
+		os.Remove(tmpPath)
 	}
 }
 

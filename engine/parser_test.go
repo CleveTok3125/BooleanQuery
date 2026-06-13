@@ -124,12 +124,12 @@ func TestParseWildcard(t *testing.T) {
 
 func TestCreateTerm(t *testing.T) {
 	tests := []struct {
-		name        string
-		text        string
+		name         string
+		text         string
 		wildcardMode bool
-		wantBytes   string
-		wantHasWild bool
-		wantSegsLen int
+		wantBytes    string
+		wantHasWild  bool
+		wantSegsLen  int
 	}{
 		{
 			name:         "no wildcard mode",
@@ -342,9 +342,25 @@ func TestClassify_WildcardMode(t *testing.T) {
 
 func TestSetSearchTerm_Error(t *testing.T) {
 	e := New()
-	// Unclosed single quote should cause shell.Fields to error
 	err := e.SetSearchTerm("error 'unclosed")
 	if err == nil {
 		t.Error("expected error for unclosed quote, got nil")
+	}
+}
+
+func TestGetSearchTerm(t *testing.T) {
+	e := New()
+	e.SetSearchTerm("hello world")
+	e.Classify()
+
+	st := e.GetSearchTerm()
+	if len(st.whiteList) != 2 {
+		t.Errorf("expected 2 whitelist terms, got %d", len(st.whiteList))
+	}
+	if string(st.whiteList[0].Bytes) != "hello" {
+		t.Errorf("first term = %q, want %q", string(st.whiteList[0].Bytes), "hello")
+	}
+	if string(st.whiteList[1].Bytes) != "world" {
+		t.Errorf("second term = %q, want %q", string(st.whiteList[1].Bytes), "world")
 	}
 }

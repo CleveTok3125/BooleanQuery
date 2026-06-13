@@ -14,10 +14,10 @@ func newTestEngine(cfg Config, query string) *Engine {
 
 func TestIndexWithQuestionMark(t *testing.T) {
 	tests := []struct {
-		name   string
-		s      []byte
-		sub    []byte
-		want   int
+		name string
+		s    []byte
+		sub  []byte
+		want int
 	}{
 		{"simple match", []byte("hello"), []byte("hello"), 0},
 		{"no match", []byte("hello"), []byte("world"), -1},

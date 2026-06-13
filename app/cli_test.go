@@ -28,8 +28,8 @@ func setCLIDefaults() {
 
 func TestApplyConfigToEngine(t *testing.T) {
 	tests := []struct {
-		name string
-		fn   func()
+		name  string
+		fn    func()
 		check func(t *testing.T, e *engine.Engine)
 	}{
 		{
