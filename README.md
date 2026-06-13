@@ -67,9 +67,31 @@ go build -o bq ./src/
 
 ```fish
 ./bq "QUERY_STRING" [FILE_PATHS...]
+./bq -e "PATTERN_1" -e "PATTERN_2" [FILE_PATHS...]
 ```
 
 If no files are provided, `BooleanQuery` reads from stdin.
+
+### Multiple Patterns (`-e`)
+
+Use `-e` to specify multiple independent queries. Results matching **any** of the patterns are shown:
+
+```fish
+./bq -e "error timeout" -e "+warning +critical"
+```
+
+```fish
+./bq -e "~john ~jane" -e "-retired" *.txt
+```
+
+> **Note:** If a pattern starts with `-` (e.g. `-retired`), use the `=` syntax to avoid ambiguity:
+> `--pattern="-retired"` or `-e="-retired"`.
+
+**Rules:**
+* Each `-e` pattern may use its own boolean operators (`+`, `-`, `~`, `^`).
+* A line matching **any** `-e` pattern is included.
+* When `-e` is used, all positional arguments are treated as file paths.
+* Multiple `-e` flags can be used.
 
 ### Search Logic (Query Syntax)
 
@@ -102,24 +124,14 @@ The line must contain these terms in the **exact order** they appear in the quer
 
 ### Notes
 
-* Grouping can be done by using `'` (single quotes)
+* Grouping can be done by using `'` (single quotes) or `"` (double quotes)
 for strings containing special characters:
   * Example: `./bq "+'+2 cards' ~reverse"`
-  * However, in some special cases,
-    such as `*` matches `*` in wildcard,
-    the escape sequence must be used.
 
-* Problem with `\`:
-  * Due to multiple layers of shell parsing,
-  `\` is interpreted as an escape sequence and is escaped before reaching the query.
-  * There is a workaround for this problem,
-  you can use multiple `\` or `'` (single quotes).
-  * For example, you can find the string `\query` by passing in `"\\\query"` or `"'\query'"`
-  (double quotes surrounding single quotes).
+* `\` is treated as a literal character and is not interpreted as an escape sequence.
 
 * In wildcard mode, `*` and `?` are occupied and implicitly understood as query syntax:
   * To find `*` and `?` literally, use the escape character `@`.
-  * *Why use `@` instead of `\`?* Due to the issue mentioned above.
 
 * Only the first character of a query group is checked to see
 if it's a valid query prefix.
@@ -131,7 +143,8 @@ if it's a valid query prefix.
 
 * Using a NOT query (`-`) at the beginning of a query string
 can cause the parser to misinterpret it as an argument.\
-    This can be fixed by placing it after or grouping it with `'` (single quotes).
+    This can be fixed by placing it after, grouping it with `'` (single quotes),
+    or using `-e` (e.g. `./bq -e="-timeout" file`).
 
 * To ensure the print order in parallel processing,
 a disk buffer will be used and temporary file generated will be stored
