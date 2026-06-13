@@ -32,11 +32,23 @@ func randPath() string {
 }
 
 func main() {
-	const numLines = 100000
+	outputPath := "test/bench.log"
+	numLines := 100000
+
+	if len(os.Args) > 1 {
+		outputPath = os.Args[1]
+	}
+	if len(os.Args) > 2 {
+		n, err := fmt.Sscanf(os.Args[2], "%d", &numLines)
+		if n != 1 || err != nil {
+			log.Fatalf("invalid line count: %s", os.Args[2])
+		}
+	}
+
 	seed := time.Now().UnixNano()
 	rng := rand.New(rand.NewSource(seed))
 
-	f, err := os.Create("test/bench.log")
+	f, err := os.Create(outputPath)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,5 +87,5 @@ func main() {
 		fmt.Fprintf(f, "%s [%s] [%s] %s\n", ts, level, comp, line)
 	}
 
-	log.Printf("Generated %d lines to test/bench.log", numLines)
+	log.Printf("Generated %d lines to %s", numLines, outputPath)
 }

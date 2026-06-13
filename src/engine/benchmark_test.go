@@ -3,24 +3,26 @@ package engine
 import (
 	"bytes"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func benchDataPath() string {
-	// Try common locations for testdata/bench.log
 	candidates := []string{
-		"testdata/bench.log",
-		"../testdata/bench.log",
-		filepath.Join("..", "testdata", "bench.log"),
+		"../../.test/bigbench.log",
+		"../../test/bench.log",
+		"../.test/bigbench.log",
+		"../test/bench.log",
+		".test/bigbench.log",
+		".test/bench.log",
+		"test/bench.log",
 	}
 	for _, p := range candidates {
 		if _, err := os.Stat(p); err == nil {
 			return p
 		}
 	}
-	return "testdata/bench.log"
+	return "../../test/bench.log"
 }
 
 var benchText = []byte("2026-06-13 10:30:45 ERROR [app.server] critical: database connection timeout after 30s (host=db-01, db=prod)")
@@ -177,7 +179,7 @@ func BenchmarkFileSearch(b *testing.B) {
 	path := benchDataPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		b.Skip("testdata/bench.log not found, run: go run ./cmd/genbench")
+		b.Skip("bench.log not found, run: go run ./cmd/genbench")
 	}
 	lines := strings.Split(string(data), "\n")
 	b.ResetTimer()
@@ -195,7 +197,7 @@ func BenchmarkFileSearch_ExactWord(b *testing.B) {
 	path := benchDataPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		b.Skip("testdata/bench.log not found, run: go run ./cmd/genbench")
+		b.Skip("bench.log not found, run: go run ./cmd/genbench")
 	}
 	lines := strings.Split(string(data), "\n")
 	b.ResetTimer()
@@ -212,7 +214,7 @@ func openBenchFile(b *testing.B) *os.File {
 	path := benchDataPath()
 	f, err := os.Open(path)
 	if err != nil {
-		b.Skip("testdata/bench.log not found, run: go run ./cmd/genbench")
+		b.Skip("bench.log not found, run: go run ./cmd/genbench")
 	}
 	return f
 }
